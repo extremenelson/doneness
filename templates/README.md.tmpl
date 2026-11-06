@@ -1,0 +1,18 @@
+# {{.Name}}
+
+One sentence on what this does and who it is for.
+
+## Develop
+
+```sh
+make          # list targets
+make check    # format, tidy, lint, test: run before every commit
+make run ARGS="-name Alex"
+make build    # binary lands in ./bin/{{.Name}}
+```
+
+## Layout
+
+- `cmd/{{.Name}}/` — entry point; thin
+- `internal/` — everything else; not importable from other modules
+- `docs/adr/` — one file per decision

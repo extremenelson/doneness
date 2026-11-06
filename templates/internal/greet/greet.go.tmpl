@@ -1,0 +1,21 @@
+// Package greet is a placeholder showing the shape of an internal package.
+// Delete it once you have real code.
+package greet
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// ErrEmptyName is a sentinel error callers can test with errors.Is.
+var ErrEmptyName = errors.New("name must not be empty")
+
+// Hello returns a greeting for name.
+func Hello(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", ErrEmptyName
+	}
+	return fmt.Sprintf("Hello, %s!", name), nil
+}

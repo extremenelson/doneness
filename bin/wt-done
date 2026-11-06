@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ~/bin/wt-done
+# wt-done <bead-id> [base-branch]: remove a bead's worktree; delete its branch if merged.
+# Run it from another worktree (normally main), not from the one being removed.
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+  echo "usage: wt-done <bead-id> [base-branch]" >&2
+  exit 64
+fi
+id="$1"
+base="${2:-main}"
+
+if [ "$id" = "$base" ]; then
+  echo "FAIL  refusing to remove the ${base} worktree" >&2
+  exit 1
+fi
+
+common="$(git rev-parse --path-format=absolute --git-common-dir)"
+root="$(dirname "$common")"
+if [ "$(basename "$common")" = ".bare" ]; then
+  dest="${root}/${id}"
+else
+  dest="${root}.wt/${id}"
+fi
+
+case "$(pwd -P)/" in
+  "$dest"/*) echo "FAIL  you are inside $dest; cd to another worktree first" >&2; exit 1 ;;
+esac
+
+if [ -d "$dest" ]; then
+  # Refuses on uncommitted changes. That is the point; do not add --force.
+  if git -C "$root" worktree remove "$dest"; then
+    echo "OK    removed worktree $dest"
+  else
+    echo "FAIL  worktree has uncommitted or untracked files: $dest" >&2
+    exit 1
+  fi
+else
+  echo "WARN  no worktree at $dest"
+fi
+
+if ! git -C "$root" rev-parse --verify --quiet "refs/heads/${id}" >/dev/null; then
+  echo "WARN  no local branch ${id}"
+  exit 0
+fi
+
+# Squash merges leave the branch unmerged by ancestry, so ask GitHub first.
+state=""
+if command -v gh >/dev/null 2>&1; then
+  state="$(gh pr view "$id" --json state --jq .state 2>/dev/null || true)"
+fi
+
+target="$base"
+if git -C "$root" rev-parse --verify --quiet "origin/${base}" >/dev/null; then
+  target="origin/${base}"
+fi
+
+if [ "$state" = "MERGED" ]; then
+  git -C "$root" branch -D "$id" >/dev/null
+  echo "OK    deleted branch ${id} (PR merged)"
+elif git -C "$root" merge-base --is-ancestor "$id" "$target"; then
+  # Not `git branch -d`: that also succeeds for a branch that is merely pushed.
+  git -C "$root" branch -D "$id" >/dev/null
+  echo "OK    deleted branch ${id} (contained in ${target})"
+else
+  echo "WARN  kept branch ${id}: not merged into ${target}, or merge state unknown"
+fi

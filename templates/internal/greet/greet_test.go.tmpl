@@ -1,0 +1,32 @@
+package greet
+
+import (
+	"errors"
+	"testing"
+)
+
+func TestHello(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr error
+	}{
+		{name: "simple", input: "Alex", want: "Hello, Alex!"},
+		{name: "trims whitespace", input: "  Alex ", want: "Hello, Alex!"},
+		{name: "empty", input: "", wantErr: ErrEmptyName},
+		{name: "only spaces", input: "   ", wantErr: ErrEmptyName},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Hello(tt.input)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Hello(%q) error = %v, want %v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("Hello(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

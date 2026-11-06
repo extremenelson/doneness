@@ -1,0 +1,48 @@
+// Command {{.Name}} is the entry point. Keep it thin: parse input, call
+// into internal/, report errors.
+package main
+
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+
+	"{{.Module}}/internal/greet"
+)
+
+// version is overwritten at build time: -ldflags "-X main.version=..."
+var version = "dev"
+
+func main() {
+	if err := run(os.Args[1:], os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, "{{.Name}}:", err)
+		os.Exit(1)
+	}
+}
+
+// run holds the real logic so tests can call it without a subprocess.
+func run(args []string, out io.Writer) error {
+	fl := flag.NewFlagSet("{{.Name}}", flag.ContinueOnError)
+	name := fl.String("name", "world", "who to greet")
+	showVersion := fl.Bool("version", false, "print version and exit")
+	if err := fl.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
+	}
+
+	if *showVersion {
+		_, err := fmt.Fprintln(out, version)
+		return err
+	}
+
+	msg, err := greet.Hello(*name)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(out, msg)
+	return err
+}

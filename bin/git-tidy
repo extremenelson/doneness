@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# ~/bin/git-tidy
+# git-tidy [--apply]: delete local branches whose upstream is gone. Dry run by default.
+set -euo pipefail
+
+apply=0
+[ "${1:-}" = "--apply" ] && apply=1
+
+if git fetch --prune --quiet 2>/dev/null; then
+  echo "OK    fetched and pruned remotes"
+else
+  echo "WARN  fetch failed; working from last known remote state"
+fi
+git worktree prune
+
+current="$(git branch --show-current)"
+in_worktree="$(git worktree list --porcelain | sed -n 's#^branch refs/heads/##p')"
+
+count=0
+while read -r branch track; do
+  [ "$track" = "[gone]" ] || continue
+  if [ "$branch" = "$current" ] || printf '%s\n' "$in_worktree" | grep -qx -- "$branch"; then
+    echo "SKIP  ${branch} (checked out in a worktree)"
+    continue
+  fi
+  count=$((count + 1))
+  if [ "$apply" -eq 1 ]; then
+    git branch -D "$branch" >/dev/null
+    echo "OK    deleted ${branch}"
+  else
+    echo "WOULD delete ${branch}"
+  fi
+done < <(git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads)
+
+if [ "$apply" -eq 0 ] && [ "$count" -gt 0 ]; then
+  echo "dry run: re-run with --apply to delete ${count} branch(es)"
+fi
+[ "$count" -gt 0 ] || echo "OK    nothing to tidy"

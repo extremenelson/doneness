@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# ~/bin/dev-start
+# dev-start: bring this checkout and its issue data up to date.
+set -uo pipefail
+
+fail=0
+if git pull --rebase --quiet; then
+  echo "OK    git pull --rebase"
+else
+  echo "FAIL  git pull --rebase"
+  fail=$((fail + 1))
+fi
+
+if [ -d .beads ]; then
+  if command -v bd >/dev/null 2>&1; then
+    if bd dolt pull >/dev/null 2>&1; then
+      echo "OK    bd dolt pull"
+    else
+      echo "FAIL  bd dolt pull"
+      fail=$((fail + 1))
+    fi
+  else
+    echo "WARN  .beads exists but bd is not installed; issue data not synced"
+  fi
+else
+  echo "SKIP  no .beads directory"
+fi
+
+exit "$fail"

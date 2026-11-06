@@ -1,0 +1,16 @@
+version: "2"
+
+linters:
+  # "standard" = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - errorlint   # wrapped-error mistakes (== instead of errors.Is)
+    - misspell
+    - nolintlint  # every //nolint must name a linter and give a reason
+    - unconvert
+    - unparam
+
+formatters:
+  enable:
+    - gofumpt     # stricter gofmt
+    - goimports   # adds/removes/sorts imports

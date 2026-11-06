@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# ~/bin/dev-land
+# dev-land: check, push code, push issue data. Nothing is "done" until this passes.
+set -uo pipefail
+
+fail=0
+step() { # step <label> <command...>
+  local label="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    echo "OK    $label"
+  else
+    echo "FAIL  $label"
+    fail=$((fail + 1))
+  fi
+}
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "FAIL  working tree is dirty; commit or stash first"
+  exit 1
+fi
+
+if [ -f Makefile ]; then
+  step "make check" make check
+else
+  echo "WARN  no Makefile; nothing checked"
+fi
+
+if [ "$fail" -eq 0 ]; then
+  step "git push" git push
+else
+  echo "SKIP  git push (check failed)"
+fi
+
+if [ -d .beads ]; then
+  if command -v bd >/dev/null 2>&1; then
+    step "bd dolt push" bd dolt push
+  else
+    echo "WARN  .beads exists but bd is not installed; issue data not pushed"
+  fi
+fi
+
+exit "$fail"

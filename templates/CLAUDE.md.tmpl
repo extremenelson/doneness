@@ -1,0 +1,33 @@
+# {{.Name}}
+
+## What this is
+One paragraph. The user, the job, the non-goals.
+
+## Commands
+- `make check` before every commit and before you say you are done.
+- `make test`, `make build`, `make run`. Bare `make` lists the targets.
+
+## Workflow
+- Issues live in beads. Run `bd prime` at session start. One bead per branch.
+- Never work outside the files your bead names. If scope grows, create a new bead.
+- Write the acceptance tests first and show them failing.
+- Small commits, Conventional Commits format, `Refs: <bead-id>` in the footer.
+
+## Rules
+- Every status line reflects the real result. No unconditional success.
+- Do not read or write secrets. Use `.env.example` names only.
+- Do not add a dependency without saying why in the PR.
+- Prefer refactoring to rewriting.
+- If the same test fails three times, stop and report. Do not try a fourth patch.
+
+## Go conventions
+- `cmd/{{.Name}}/main.go` stays thin; logic lives under `internal/`.
+- Tests sit beside the code and are table-driven.
+- Wrap errors with `%w`; compare with `errors.Is` and `errors.As`.
+- Standard library first.
+
+## Architecture
+See docs/architecture.md and docs/adr/. Read the ADRs your bead touches.
+
+## Learned the hard way
+(Append one line per mistake that should not recur.)

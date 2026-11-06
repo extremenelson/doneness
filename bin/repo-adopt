@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# ~/bin/repo-adopt
+# repo-adopt: convert the normal clone in the current directory to the container layout.
+# The original directory is kept beside it as <repo>.pre-adopt until you delete it.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+if [ ! -d "$root/.git" ]; then
+  echo "FAIL  $root is already a worktree or a container" >&2
+  exit 1
+fi
+if [ -n "$(git -C "$root" status --porcelain)" ]; then
+  echo "FAIL  working tree is dirty; commit or stash first" >&2
+  exit 1
+fi
+if [ "$(git -C "$root" worktree list | wc -l)" -ne 1 ]; then
+  echo "FAIL  remove existing worktrees first (git worktree list)" >&2
+  exit 1
+fi
+branch="$(git -C "$root" branch --show-current)"
+case "$branch" in
+  "")  echo "FAIL  detached HEAD; switch to the default branch first" >&2; exit 1 ;;
+  */*) echo "FAIL  branch name contains a slash; switch to the default branch first" >&2; exit 1 ;;
+esac
+old="${root}.pre-adopt"
+if [ -e "$old" ]; then
+  echo "FAIL  $old already exists" >&2
+  exit 1
+fi
+
+cd "$(dirname "$root")"
+mv "$root" "$old"
+mkdir "$root"
+mv "$old/.git" "$root/.bare"
+git --git-dir="$root/.bare" config core.bare true
+rm -f "$root/.bare/index"
+printf 'gitdir: ./.bare\n' > "$root/.git"
+git -C "$root" worktree add --quiet "$root/$branch" "$branch"
+echo "OK    container ready: $root (worktree: $root/$branch)"
+
+leftovers="$(diff -rq "$old" "$root/$branch" 2>/dev/null | grep "^Only in ${old}" || true)"
+if [ -n "$leftovers" ]; then
+  echo "WARN  ignored or untracked files were not carried over. Copy what you need:"
+  printf '%s\n' "$leftovers"
+fi
+echo "next: cd \"$root/$branch\"; when satisfied, delete $old yourself"

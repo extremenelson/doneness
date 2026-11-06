@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Blocks session end while `make check` fails. Exit 2 returns stderr to the agent.
+set -uo pipefail
+
+input="$(cat)"
+# Avoid a loop: if this stop was already triggered by a Stop hook, let it end.
+if command -v jq >/dev/null 2>&1; then
+  if [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = "true" ]; then
+    exit 0
+  fi
+else
+  echo "stop-check: jq not found; loop guard disabled" >&2
+fi
+
+cd "${CLAUDE_PROJECT_DIR:-.}" || { echo "stop-check: cannot cd to project dir" >&2; exit 0; }
+
+if [ ! -f Makefile ]; then
+  echo "stop-check: no Makefile here; skipping check" >&2
+  exit 0
+fi
+
+if out="$(make check 2>&1)"; then
+  exit 0
+fi
+printf 'make check failed. Fix before finishing:\n%s\n' "$out" | tail -n 60 >&2
+exit 2

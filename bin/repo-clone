@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# ~/bin/repo-clone
+# repo-clone <url> [directory]: clone into the container layout (.bare + worktrees).
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+  echo "usage: repo-clone <url> [directory]" >&2
+  exit 64
+fi
+url="$1"
+name="${2:-$(basename "$url" .git)}"
+
+if [ -e "$name" ]; then
+  echo "FAIL  $name already exists" >&2
+  exit 1
+fi
+
+mkdir -p "$name"
+container="$(cd "$name" && pwd)"
+git init --quiet --bare "$container/.bare"
+printf 'gitdir: ./.bare\n' > "$container/.git"
+git -C "$container" remote add origin "$url"
+
+if git -C "$container" fetch --quiet origin; then
+  echo "OK    fetched origin"
+else
+  echo "FAIL  could not fetch $url; container left at $container" >&2
+  exit 1
+fi
+
+if ! git -C "$container" remote set-head origin --auto >/dev/null 2>&1; then
+  echo "FAIL  remote has no default branch (empty repository?); container left at $container" >&2
+  exit 1
+fi
+default="$(git -C "$container" symbolic-ref --short refs/remotes/origin/HEAD)"
+default="${default#origin/}"
+
+git -C "$container" symbolic-ref HEAD "refs/heads/${default}"
+git -C "$container" worktree add --quiet --track -b "$default" "$container/$default" "origin/${default}"
+
+echo "OK    container ready: $container"
+echo "next: cd \"$container/$default\""
