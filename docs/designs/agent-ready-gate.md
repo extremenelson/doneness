@@ -432,7 +432,7 @@ feature answers: D1 (defer goreleaser: v0.1.0 is a plain tag, install via `go in
 | receipts | git notes attach to tree objects | probe: `git notes --ref=newproj-gate add/show <tree>` ok (git 2.56.0) | verified |
 | tree hash | seeded temp index catches tracked-but-ignored changes | probe: tree hash changed after editing a force-added ignored file | verified |
 | index path | `git rev-parse --git-path index` gives a usable path | prints relative `.git/index`; needs `--path-format=absolute` | finding |
-| worktree settings | Claude Code reads main checkout's settings.local.json in worktrees | Claude Code settings docs (summarized fetch) | unverified |
+| worktree settings | Claude Code reads main checkout's settings.local.json in worktrees | T1 probe 2026-11-07 (scripts/t1-worktree-hook-probe.sh, Claude Code 2.1.319): hook fired in `repo.wt/plain`; gtr not installed, untested | verified (plain git) |
 | block + systemMessage | Stop hook JSON may combine `decision:block` and `systemMessage` | hooks docs: combination undocumented | unverified |
 | config parser | `.newproj.toml` parsable with the stdlib | go.mod:1-3 has no `require`; Go stdlib has no TOML | finding |
 
@@ -962,14 +962,16 @@ Synthesized from this review's findings. Each task derives from a specific
 finding above. Run with Claude Code or Codex; checkbox as you ship.
 Effort assumption: tests ~50x, features ~30x, architecture ~5x human÷CC; realistic total CC ~1.5-2 days, human ~3-4 weeks [estimated] (OV3).
 
-- [ ] **T1 (P1, human: ~30min / CC: ~5min + your 15 min)** — probe — Prove worktree settings resolution before gate code
+- [x] **T1 (P1, human: ~30min / CC: ~5min + your 15 min)** — probe — Prove worktree settings resolution before gate code
   - Surfaced by: Outside Voice — OV1 / D12
   - Files: none (scratch repo; hook script recording cwd)
   - Verify: hook fires for Claude sessions in plain-git and gtr worktrees; else make `--shared` the default and reopen D2
-- [ ] **T2 (P1, human: ~4h / CC: ~25min)** — scaffold — Characterization tests for today's main.go, green before refactor
+  - Result (2026-11-07): D2 HOLDS for plain `git worktree add` (hook fired, blocked once then allowed). In the worktree session, stdin `cwd`, the hook's working directory and `CLAUDE_PROJECT_DIR` all pointed at the worktree, so D7 is a safeguard rather than a requirement there. gtr worktrees untested (not installed); F3 block+systemMessage visibility awaiting the user's observation.
+- [x] **T2 (P1, human: ~4h / CC: ~25min)** — scaffold — Characterization tests for today's main.go, green before refactor
   - Surfaced by: Test review — T1 / D11
   - Files: main_test.go (later moved to internal/scaffold)
   - Verify: `go test -race ./...` green on unmodified main.go
+  - Result (2026-11-07): main_test.go, 8 tests green on unmodified main.go (`go test -race`), lint clean; mutation check caught 4/4 deliberate breaks (embed without `all:`, .sh mode 0644, wrong .git pointer, changed commit message).
 - [ ] **T3 (P1, human: ~1 day / CC: ~40min)** — scaffold — Restructure into `new` subcommand + internal/scaffold; verify-only `check`, `fix`, derived prefix, hook via gate.HookCommand, .newproj.json, golangci-lint v2 pinned in template CI
   - Surfaced by: Scope D3; Architecture A1 / D6; OV12
   - Files: main.go, internal/scaffold/, templates/Makefile.tmpl, templates/.claude/settings.json.tmpl, templates/.github/workflows/ci.yml.tmpl, delete templates/.claude/hooks/stop-check.sh.tmpl
