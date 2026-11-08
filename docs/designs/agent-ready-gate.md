@@ -455,6 +455,7 @@ Correction: use `git rev-parse --path-format=absolute --git-path index` (step 2)
 ### F3: block + systemMessage proof (required proof, no question)
 Finding: 3, INFORMATIONAL, confidence 6/10, docs/designs/agent-ready-gate.md:79, reviewer: plan-eng-review
 Carried forward: the manual hook test also asserts that a blocked attempt's `systemMessage` appears to the user. If it doesn't, warnings on the block path move into `reason`. Proof of the approved step 9 output-channel behavior.
+Result (2026-11-07, T1 probe with --block): the user does not recall seeing the F3 message and believes it did not appear. Treated as not shown: on the block path, every user-relevant warning is also included in `reason` (T6); `systemMessage` stays for the allow path.
 
 ### R1: config file format
 Finding: 1, INFORMATIONAL, confidence 9/10, go.mod:1-3, reviewer: plan-eng-review
@@ -976,10 +977,11 @@ Effort assumption: tests ~50x, features ~30x, architecture ~5x human÷CC; realis
   - Surfaced by: Scope D3; Architecture A1 / D6; OV12
   - Files: main.go, internal/scaffold/, templates/Makefile.tmpl, templates/.claude/settings.json.tmpl, templates/.github/workflows/ci.yml.tmpl, delete templates/.claude/hooks/stop-check.sh.tmpl
   - Verify: T2 tests pass with only intentional-change edits; generated `make check` green and `git status` clean
-- [ ] **T4 (P1, human: ~1h / CC: ~10min)** — gate — Contract: Config/LoadConfig/WriteConfig (JSON), HookCommand(binPath, budget), IsGateHook; round-trip tests
+- [x] **T4 (P1, human: ~1h / CC: ~10min)** — gate — Contract: Config/LoadConfig/WriteConfig (JSON), HookCommand(binPath, budget), IsGateHook; round-trip tests
   - Surfaced by: Scope R1 / D4; Architecture A1 / D6; OV7 / D15
   - Files: internal/gate/config.go, internal/gate/hookcmd.go (+ tests)
   - Verify: `LoadConfig(WriteConfig(c)) == c`; `IsGateHook(HookCommand(p,b))`
+  - Result (2026-11-07): internal/gate/config.go and hookcmd.go. `HookCommand(bin, hookTimeout)` owns the 60s minimum and the 30s budget margin. Tests run the generated hook through `sh` against a fake binary (absolute path, path with spaces and quotes, PATH lookup), check missing-binary output is one JSON object with exit 0, and check strict config decoding. Mutation check caught 5/5 (quote escaping, budget margin, regex anchoring, unknown-key rejection, missing binary blocking).
 - [ ] **T5 (P1, human: ~3 days / CC: ~2h)** — gate — Core: absolute-path seeded tree hash, machine flock slots, sh -c runner (pgroup, CI=1, stdin null, inherited slot fd, Pdeathsig), guard, PASS-only notes with retry, last-red state, exit codes 0-4, cache key incl. version+GOOS/GOARCH
   - Surfaced by: F2; A2 / D5; C1 / D8; OV4 / D13; OV5 / D14; OV8 / D16; OV13 / D18; C3 / D10
   - Files: internal/gate/ (treehash.go, lock.go, run.go, receipt.go, gate.go + tests)
