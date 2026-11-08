@@ -22,5 +22,6 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v8
         with:
+          version: v2.15.0
           install-only: true
       - run: make check

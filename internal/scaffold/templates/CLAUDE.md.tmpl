@@ -4,7 +4,9 @@
 One paragraph. The user, the job, the non-goals.
 
 ## Commands
-- `make check` before every commit and before you say you are done.
+- `make check` before every commit and before you say you are done. It only verifies;
+  `make fix` rewrites formatting and go.mod. A Stop hook (`newproj gate --hook`) runs the
+  check from `.newproj.json` and will not let you finish while it is red.
 - `make test`, `make build`, `make run`. Bare `make` lists the targets.
 
 ## Workflow

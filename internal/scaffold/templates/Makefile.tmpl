@@ -3,7 +3,7 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 
 .DEFAULT_GOAL := help
-.PHONY: help build run test cover lint fmt tidy check install clean
+.PHONY: help build run test cover lint fmt tidy fix check install clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-9s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,13 +24,21 @@ cover: ## Run tests and open an HTML coverage report
 lint: ## Run golangci-lint (includes go vet and staticcheck)
 	golangci-lint run
 
-fmt: ## Format code and fix imports
+fmt: ## Format code and fix imports (rewrites files)
 	golangci-lint fmt
 
-tidy: ## Sync go.mod and go.sum with the imports in the code
+tidy: ## Sync go.mod and go.sum with the imports in the code (rewrites files)
 	go mod tidy
 
-check: fmt tidy lint test ## Everything that must pass before a commit
+fix: fmt tidy ## Rewrite formatting and go.mod/go.sum; run before check if it complains
+
+# check only verifies: it never rewrites files, so the done-gate can run it
+# (.newproj.json) and trust that a green tree is the tree that was tested.
+check: ## Everything that must pass before a commit (read-only)
+	golangci-lint fmt --diff
+	go mod tidy -diff
+	golangci-lint run
+	go test -race ./...
 
 install: ## Install the binary into $(go env GOBIN) or ~/go/bin
 	go install $(LDFLAGS) ./cmd/$(BINARY)

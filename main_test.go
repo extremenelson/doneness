@@ -5,8 +5,10 @@ package main
 // When the restructure lands, only assertions for the approved intentional
 // changes may be edited (derived module prefix, verify-only `check` + `fix`,
 // Stop hook via gate.HookCommand, .newproj.json, stop-check.sh removed).
+// T3 applied those changes; each edited assertion is marked "T3:".
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -22,12 +24,12 @@ import (
 	"time"
 
 	"github.com/extremenelson/newproj/internal/gate"
+	"github.com/extremenelson/newproj/internal/scaffold"
 )
 
 // wantFiles is every file a scaffold of "demo" contains, relative to the
 // working directory, excluding git's own metadata (.git, .bare).
 var wantFiles = []string{
-	".claude/hooks/stop-check.sh",
 	".claude/settings.json",
 	".editorconfig",
 	".env.example",
@@ -36,6 +38,7 @@ var wantFiles = []string{
 	".github/workflows/ci.yml",
 	".gitignore",
 	".golangci.yml",
+	".newproj.json", // T3: gate config written by gate.WriteConfig
 	"CLAUDE.md",
 	"Makefile",
 	"README.md",
@@ -52,7 +55,10 @@ var wantFiles = []string{
 func isolateGit(t *testing.T) {
 	t.Helper()
 	cfg := filepath.Join(t.TempDir(), "gitconfig")
+	// T3: the module prefix now comes from github.user; this value keeps
+	// the pre-T3 default module paths.
 	body := "[user]\n\tname = newproj test\n\temail = test@example.invalid\n" +
+		"[github]\n\tuser = extremenelson\n" +
 		"[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n"
 	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -64,11 +70,11 @@ func isolateGit(t *testing.T) {
 
 // scaffold runs newproj with flags, creating "demo" in a fresh parent dir,
 // and returns the project directory.
-func scaffold(t *testing.T, flags ...string) string {
+func scaffoldDemo(t *testing.T, flags ...string) string {
 	t.Helper()
 	isolateGit(t)
 	parent := t.TempDir()
-	args := append(append([]string{}, flags...), "-dir", parent, "demo")
+	args := append(append([]string{"new"}, flags...), "-dir", parent, "demo") // T3: `new` subcommand
 	if err := run(args); err != nil {
 		t.Fatalf("run(%q): %v", args, err)
 	}
@@ -139,30 +145,31 @@ func readFile(t *testing.T, path string) string {
 }
 
 func TestParseArgs(t *testing.T) {
+	isolateGit(t) // T3: prefix default reads git config
 	parent := t.TempDir()
 	tests := []struct {
 		name    string
 		env     string // NEWPROJ_PREFIX
 		args    []string
-		want    config
+		want    scaffold.Config
 		wantErr string
 	}{
 		{name: "defaults", args: []string{"-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
+			want: scaffold.Config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
 		{name: "prefix flag, trailing slash trimmed", args: []string{"-prefix", "example.com/acme/", "-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "example.com/acme/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
+			want: scaffold.Config{Name: "demo", Module: "example.com/acme/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
 		{name: "prefix from env", env: "example.org/env", args: []string{"-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "example.org/env/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
+			want: scaffold.Config{Name: "demo", Module: "example.org/env/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
 		{name: "flag beats env", env: "example.org/env", args: []string{"-prefix", "example.com/flag", "-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "example.com/flag/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
+			want: scaffold.Config{Name: "demo", Module: "example.com/flag/demo", Dir: filepath.Join(parent, "demo"), Git: true}},
 		{name: "flat", args: []string{"-flat", "-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Flat: true, Git: true}},
+			want: scaffold.Config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Flat: true, Git: true}},
 		{name: "no-git implies flat", args: []string{"-no-git", "-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Flat: true}},
+			want: scaffold.Config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Flat: true}},
 		{name: "beads", args: []string{"-bd", "-dir", parent, "demo"},
-			want: config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Git: true, Beads: true}},
+			want: scaffold.Config{Name: "demo", Module: "github.com/extremenelson/demo", Dir: filepath.Join(parent, "demo"), Git: true, Beads: true}},
 		{name: "digits and hyphens allowed", args: []string{"-dir", parent, "cost-scan2"},
-			want: config{Name: "cost-scan2", Module: "github.com/extremenelson/cost-scan2", Dir: filepath.Join(parent, "cost-scan2"), Git: true}},
+			want: scaffold.Config{Name: "cost-scan2", Module: "github.com/extremenelson/cost-scan2", Dir: filepath.Join(parent, "cost-scan2"), Git: true}},
 		{name: "missing name", args: []string{"-dir", parent}, wantErr: "exactly one project name"},
 		{name: "flags after name", args: []string{"demo", "-flat"}, wantErr: "flags go before the name"},
 		{name: "uppercase rejected", args: []string{"Demo"}, wantErr: `invalid name "Demo"`},
@@ -191,7 +198,7 @@ func TestParseArgs(t *testing.T) {
 }
 
 // parseArgsQuiet runs parseArgs with usage output discarded.
-func parseArgsQuiet(args []string) (config, error) {
+func parseArgsQuiet(args []string) (scaffold.Config, error) {
 	stderr := os.Stderr
 	devnull, _ := os.Open(os.DevNull)
 	os.Stderr = devnull
@@ -213,7 +220,7 @@ func TestHelpIsNotAnError(t *testing.T) {
 }
 
 func TestRunContainerLayout(t *testing.T) {
-	dir := scaffold(t, "-prefix", "example.com/acme")
+	dir := scaffoldDemo(t, "-prefix", "example.com/acme")
 	work := filepath.Join(dir, "main")
 
 	if fi, err := os.Stat(filepath.Join(dir, ".bare")); err != nil || !fi.IsDir() {
@@ -227,7 +234,7 @@ func TestRunContainerLayout(t *testing.T) {
 		t.Errorf("container holds %d entries, want .bare, .git, main", len(entries))
 	}
 
-	assertMode(t, filepath.Join(work, ".claude/hooks/stop-check.sh"), 0o755)
+	// T3: no .sh template remains; the .sh → 0755 rule is tested in internal/scaffold.
 	assertMode(t, filepath.Join(work, "Makefile"), 0o644)
 
 	if got := gitOut(t, work, "log", "--format=%s"); got != "chore: scaffold demo" {
@@ -255,7 +262,7 @@ func TestRunContainerLayout(t *testing.T) {
 }
 
 func TestRunFlatLayout(t *testing.T) {
-	dir := scaffold(t, "-flat")
+	dir := scaffoldDemo(t, "-flat")
 	assertFiles(t, dir)
 	if fi, err := os.Stat(filepath.Join(dir, ".git")); err != nil || !fi.IsDir() {
 		t.Fatalf(".git is not a directory in a flat repo: %v", err)
@@ -269,11 +276,10 @@ func TestRunFlatLayout(t *testing.T) {
 	if got := gitOut(t, dir, "branch", "--show-current"); got != "main" {
 		t.Errorf("branch = %q, want main", got)
 	}
-	assertMode(t, filepath.Join(dir, ".claude/hooks/stop-check.sh"), 0o755)
 }
 
 func TestRunNoGit(t *testing.T) {
-	dir := scaffold(t, "-no-git")
+	dir := scaffoldDemo(t, "-no-git")
 	assertFiles(t, dir)
 	if _, err := os.Stat(filepath.Join(dir, ".git")); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("-no-git created .git (err=%v)", err)
@@ -331,7 +337,7 @@ func TestRunBeadsMissingIsBestEffort(t *testing.T) {
 	}
 	stderr := os.Stderr
 	os.Stderr = w
-	dir := scaffold(t, "-bd", "-flat")
+	dir := scaffoldDemo(t, "-bd", "-flat")
 	os.Stderr = stderr
 	_ = w.Close()
 	captured, _ := io.ReadAll(r)
@@ -356,7 +362,7 @@ func TestGeneratedMakeCheck(t *testing.T) {
 			t.Skipf("%s not on PATH", tool)
 		}
 	}
-	dir := scaffold(t, "-flat", "-prefix", "example.com/acme")
+	dir := scaffoldDemo(t, "-flat", "-prefix", "example.com/acme")
 	cmd := exec.Command("make", "check")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -364,6 +370,18 @@ func TestGeneratedMakeCheck(t *testing.T) {
 	}
 	if got := gitOut(t, dir, "status", "--porcelain"); got != "" {
 		t.Errorf("make check left the tree dirty:\n%s", got)
+	}
+
+	// T3: the generated project passes its own done-gate (make check via
+	// .newproj.json), so a fresh scaffold starts green.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	res, err := gate.Run(context.Background(), gate.Options{Root: dir, Slots: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outcome != gate.Pass {
+		t.Errorf("generated repo's gate = %s: %s", res.Outcome, res.Detail)
 	}
 }
 
@@ -497,5 +515,100 @@ func TestHookEndToEnd(t *testing.T) {
 	}
 	if r := stop(); len(r) != 0 {
 		t.Fatalf("green gate: %v, want {}", r)
+	}
+}
+
+// T3: with no -prefix, no $NEWPROJ_PREFIX and no github.user, newproj new
+// stops and says how to set a prefix instead of guessing one.
+func TestModulePrefixRequired(t *testing.T) {
+	isolateGit(t)
+	empty := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(empty, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", empty)
+	_, err := parseArgsQuiet([]string{"-dir", t.TempDir(), "demo"})
+	if err == nil || !strings.Contains(err.Error(), "pass -prefix") {
+		t.Fatalf("err = %v, want guidance to pass -prefix", err)
+	}
+}
+
+// T3: the pre-subcommand form still scaffolds (one-release alias) and says
+// it is deprecated.
+func TestOldFormIsDeprecatedAlias(t *testing.T) {
+	isolateGit(t)
+	parent := t.TempDir()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stderr := os.Stderr
+	os.Stderr = w
+	runErr := run([]string{"-flat", "-dir", parent, "demo"})
+	os.Stderr = stderr
+	_ = w.Close()
+	captured, _ := io.ReadAll(r)
+	if runErr != nil {
+		t.Fatalf("old form failed: %v", runErr)
+	}
+	if !strings.Contains(string(captured), "is deprecated; use `newproj new") {
+		t.Errorf("stderr = %q, want a deprecation note", captured)
+	}
+	assertFiles(t, filepath.Join(parent, "demo"))
+}
+
+func TestUnknownCommandAndNoArgs(t *testing.T) {
+	stderr := os.Stderr
+	devnull, _ := os.Open(os.DevNull)
+	os.Stderr = devnull
+	defer func() { os.Stderr = stderr; _ = devnull.Close() }()
+	for _, args := range [][]string{nil, {"Bogus"}, {"no_such"}} {
+		var ec exitCode
+		if err := run(args); !errors.As(err, &ec) || ec != 2 {
+			t.Errorf("run(%q) = %v, want exit 2 with usage", args, err)
+		}
+	}
+}
+
+// T3: the scaffold's Stop hook runs the gate through gate.HookCommand (PATH
+// lookup, since settings.json is committed) with the 1800s timeout, and the
+// gate config runs `make check`.
+func TestScaffoldGateWiring(t *testing.T) {
+	dir := scaffoldDemo(t, "-flat")
+	var settings struct {
+		Hooks struct {
+			Stop []struct {
+				Hooks []struct {
+					Type    string `json:"type"`
+					Command string `json:"command"`
+					Timeout int    `json:"timeout"`
+				} `json:"hooks"`
+			} `json:"Stop"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(dir, ".claude/settings.json"))), &settings); err != nil {
+		t.Fatalf("settings.json is not valid JSON: %v", err)
+	}
+	if len(settings.Hooks.Stop) != 1 || len(settings.Hooks.Stop[0].Hooks) != 1 {
+		t.Fatalf("want exactly one Stop hook, got %+v", settings.Hooks.Stop)
+	}
+	h := settings.Hooks.Stop[0].Hooks[0]
+	want, err := gate.HookCommand("", scaffold.HookTimeout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Type != "command" || h.Command != want || h.Timeout != 1800 || !gate.IsGateHook(h.Command) {
+		t.Errorf("Stop hook = %+v, want command %q with timeout 1800", h, want)
+	}
+
+	cfg, err := gate.LoadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Gate.Command != "make check" {
+		t.Errorf("gate command = %q, want make check", cfg.Gate.Command)
+	}
+	if strings.Contains(readFile(t, filepath.Join(dir, "Makefile")), "check: fmt tidy") {
+		t.Error("Makefile check still depends on the rewriting fmt/tidy targets")
 	}
 }

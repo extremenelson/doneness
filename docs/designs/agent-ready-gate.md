@@ -973,10 +973,11 @@ Effort assumption: tests ~50x, features ~30x, architecture ~5x human÷CC; realis
   - Files: main_test.go (later moved to internal/scaffold)
   - Verify: `go test -race ./...` green on unmodified main.go
   - Result (2026-11-07): main_test.go, 8 tests green on unmodified main.go (`go test -race`), lint clean; mutation check caught 4/4 deliberate breaks (embed without `all:`, .sh mode 0644, wrong .git pointer, changed commit message).
-- [ ] **T3 (P1, human: ~1 day / CC: ~40min)** — scaffold — Restructure into `new` subcommand + internal/scaffold; verify-only `check`, `fix`, derived prefix, hook via gate.HookCommand, .newproj.json, golangci-lint v2 pinned in template CI
+- [x] **T3 (P1, human: ~1 day / CC: ~40min)** — scaffold — Restructure into `new` subcommand + internal/scaffold; verify-only `check`, `fix`, derived prefix, hook via gate.HookCommand, .newproj.json, golangci-lint v2 pinned in template CI
   - Surfaced by: Scope D3; Architecture A1 / D6; OV12
   - Files: main.go, internal/scaffold/, templates/Makefile.tmpl, templates/.claude/settings.json.tmpl, templates/.github/workflows/ci.yml.tmpl, delete templates/.claude/hooks/stop-check.sh.tmpl
   - Verify: T2 tests pass with only intentional-change edits; generated `make check` green and `git status` clean
+  - Result (2026-11-07): `main.go` is a router (`new`, `gate`, `help`; `newproj [flags] <name>` kept as a deprecated alias for one release, so `new`, `gate` and `help` are reserved project names); `new_cmd.go` parses flags; `internal/scaffold` owns Create/render/initRepo with the templates moved to `internal/scaffold/templates/`. Module prefix: `-prefix`, then `$NEWPROJ_PREFIX`, then `github.com/<git config github.user>`, else an error. Templates: read-only `check` plus `fix`, Stop hook from `gate.HookCommand("", 1800s)` with `"timeout": 1800`, `.newproj.json` via `gate.WriteConfig`, golangci-lint v2.15.0 pinned in CI, stop-check.sh deleted, README/CLAUDE.md updated. Characterization tests changed only at assertions marked `T3:`; the .sh mode rule moved to internal/scaffold. Regression mutations re-run: 7/7 caught. End to end: scaffold, `make check` (clean tree), `newproj gate` PASS, and the generated hook via `sh` returns `{}`.
 - [x] **T4 (P1, human: ~1h / CC: ~10min)** — gate — Contract: Config/LoadConfig/WriteConfig (JSON), HookCommand(binPath, budget), IsGateHook; round-trip tests
   - Surfaced by: Scope R1 / D4; Architecture A1 / D6; OV7 / D15
   - Files: internal/gate/config.go, internal/gate/hookcmd.go (+ tests)
