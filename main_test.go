@@ -7,8 +7,10 @@ package main
 // Stop hook via gate.HookCommand, .newproj.json, stop-check.sh removed).
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -17,6 +19,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/extremenelson/newproj/internal/gate"
 )
@@ -432,5 +435,67 @@ func TestGateCommandOutsideRepo(t *testing.T) {
 	var ec exitCode
 	if err := run([]string{"gate"}); !errors.As(err, &ec) || ec != 2 {
 		t.Fatalf("run(gate) outside a repo = %v, want exit 2", err)
+	}
+}
+
+// TestHookEndToEnd runs the real binary through the exact hook command
+// adopt will install (gate.HookCommand), the way Claude Code runs it: sh -c,
+// Stop-hook JSON on stdin, JSON decision on stdout, exit 0.
+func TestHookEndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds the newproj binary")
+	}
+	isolateGit(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	bin := filepath.Join(t.TempDir(), "newproj")
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+	hookCmd, err := gate.HookCommand(bin, 120*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo := t.TempDir()
+	repo, _ = filepath.EvalSymlinks(repo)
+	gitOut(t, repo, "init", "-q")
+	if err := gate.WriteConfig(repo, gate.Config{Gate: gate.Gate{Command: "test -f DONE"}}); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, repo, "add", "-A")
+	gitOut(t, repo, "commit", "-q", "-m", "init")
+
+	stop := func() map[string]any {
+		t.Helper()
+		in := fmt.Sprintf(`{"session_id":"e2e","cwd":%q,"stop_hook_active":false,"hook_event_name":"Stop"}`, repo)
+		cmd := exec.Command("/bin/sh", "-c", hookCmd)
+		cmd.Dir = t.TempDir() // Claude Code's cwd need not be the repo
+		cmd.Stdin = strings.NewReader(in)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("hook exited %v (must always exit 0)", err)
+		}
+		var resp map[string]any
+		if err := json.Unmarshal(out, &resp); err != nil {
+			t.Fatalf("hook stdout is not one JSON object: %q", out)
+		}
+		return resp
+	}
+
+	if r := stop(); r["decision"] != "block" {
+		t.Fatalf("red gate: %v, want block", r)
+	}
+	if r := stop(); r["decision"] != "block" {
+		t.Fatalf("second red stop: %v, want block", r)
+	}
+	if r := stop(); r["decision"] != nil || !strings.HasPrefix(fmt.Sprint(r["systemMessage"]), "NOT DONE") {
+		t.Fatalf("third red stop: %v, want allow with NOT DONE", r)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "DONE"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := stop(); len(r) != 0 {
+		t.Fatalf("green gate: %v, want {}", r)
 	}
 }

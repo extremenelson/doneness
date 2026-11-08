@@ -988,10 +988,11 @@ Effort assumption: tests ~50x, features ~30x, architecture ~5x human÷CC; realis
   - Verify: test plan Edge Cases 1-7 and Critical Path exit-code table
   - Result (2026-11-07): internal/gate {treehash,slots,runner,receipt,gate,paths}.go plus a minimal `newproj gate [--budget D] [--no-cache]` route (gate_cmd.go); `gate` is now reserved as a subcommand name. 28 gate tests + CLI exit-code tests green under -race; cached pass on 10k files measured at 39ms. Mutation check caught 9/9 (the shell-only kill is masked by the post-exit group reap; removing both fails two tests).
   - Two bugs the tests found and fixed: (1) `git notes add` does not compare-and-swap the notes ref, so concurrent passes in different worktrees silently lost receipts (5/5 runs); receipt writes are now serialized with a flock in the git common dir and read back after writing. (2) A background process left by the check held the output pipe, so the gate waited for it (30s in the test); `cmd.WaitDelay` (500ms) bounds that, then the leftover group is killed.
-- [ ] **T6 (P1, human: ~1 day / CC: ~45min)** — gate — Hook mode: JSON channel, stdin cwd resolution, session counter, budget, systemMessage warnings
+- [x] **T6 (P1, human: ~1 day / CC: ~45min)** — gate — Hook mode: JSON channel, stdin cwd resolution, session counter, budget, systemMessage warnings
   - Surfaced by: A3 / D7; F3; spec R3-1/2/5 fixes
   - Files: internal/gate/hook.go (+ tests)
   - Verify: hook-loop critical path; manual Claude Code test incl. block+systemMessage visibility
+  - Result (2026-11-07): internal/gate/hook.go and `newproj gate --hook`. Repo from stdin `cwd` (fallback: process cwd); per-session counter blocks twice, then allows with NOT DONE and resets; a pass deletes the counter; counters older than 7 days pruned; every failure (git error, bad stdin, not a repo, timeout) is a counted block, so the loop is always bounded; block `reason` carries the outcome, changed files, warnings and the last 60 output lines (F3). 12 hook tests plus an end-to-end test that runs the built binary through `gate.HookCommand` via `sh`. Mutation check caught 8/8 after one test was strengthened (its expected output also appeared in the command text). Pending: a manual run in a real Claude Code session.
 - [ ] **T7 (P1, human: ~1 day / CC: ~40min)** — gate — `--status`: `<rev>^{tree}`, default-branch resolution, uncommitted config, config drift, hook missing, stale binary path
   - Surfaced by: D2; C3 / D10; OV7 / D15
   - Files: internal/gate/status.go (+ tests)

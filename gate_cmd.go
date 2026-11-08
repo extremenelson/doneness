@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,6 +29,7 @@ func runGate(args []string) error {
 	}
 	budget := fl.Duration("budget", 0, "give up after this long, including the wait for a slot (0: no limit)")
 	noCache := fl.Bool("no-cache", false, "run the check even if a receipt already proves this tree")
+	hook := fl.Bool("hook", false, "run as a Claude Code Stop hook: read hook JSON on stdin, print the decision as JSON, exit 0")
 	if err := fl.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -50,6 +52,13 @@ func runGate(args []string) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
+	}
+	if *hook {
+		if *noCache {
+			fmt.Fprintln(os.Stderr, "gate: --no-cache is not supported with --hook")
+		}
+		resp := gate.Hook(ctx, os.Stdin, gate.HookOptions{FallbackDir: wd})
+		return json.NewEncoder(os.Stdout).Encode(resp)
 	}
 	root, err := gate.TopLevel(ctx, wd)
 	if err != nil {
