@@ -53,12 +53,25 @@ func (c config) workDir() string {
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
+		var ec exitCode
+		if errors.As(err, &ec) {
+			os.Exit(int(ec))
+		}
 		fmt.Fprintln(os.Stderr, "newproj:", err)
 		os.Exit(1)
 	}
 }
 
+// exitCode is an error that carries a specific process exit status; the
+// command has already reported what happened.
+type exitCode int
+
+func (e exitCode) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
+
 func run(args []string) error {
+	if len(args) > 0 && args[0] == "gate" {
+		return runGate(args[1:])
+	}
 	cfg, err := parseArgs(args)
 	if errors.Is(err, flag.ErrHelp) {
 		return nil

@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/extremenelson/newproj/internal/gate"
 )
 
 // wantFiles is every file a scaffold of "demo" contains, relative to the
@@ -359,5 +361,76 @@ func TestGeneratedMakeCheck(t *testing.T) {
 	}
 	if got := gitOut(t, dir, "status", "--porcelain"); got != "" {
 		t.Errorf("make check left the tree dirty:\n%s", got)
+	}
+}
+
+// TestGateCommandExitCodes drives `newproj gate` through run() and checks
+// the exit-code contract (eng review D8): 0 pass, 1 failed, 2 config error,
+// 3 tree changed, 4 timed out. Intentional change (D3): "gate" is now a
+// subcommand, so it can no longer be used as a project name.
+func TestGateCommandExitCodes(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string // "" = no .newproj.json
+		args    []string
+		want    int
+	}{
+		{name: "pass", command: "true", want: 0},
+		{name: "cached pass", command: "true", want: 0},
+		{name: "check fails", command: "exit 7", want: 1},
+		{name: "no config", want: 2},
+		{name: "command not found", command: "no-such-command-xyz", want: 2},
+		{name: "check writes a file", command: "echo x >> README", want: 3},
+		{name: "budget exceeded", command: "sleep 5", args: []string{"--budget", "300ms"}, want: 4},
+		{name: "unknown flag", command: "true", args: []string{"--nope"}, want: 2},
+		{name: "stray argument", command: "true", args: []string{"extra"}, want: 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolateGit(t)
+			t.Setenv("XDG_STATE_HOME", t.TempDir())
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			t.Setenv("NEWPROJ_SLOTS", "2")
+			repo := t.TempDir()
+			gitOut(t, repo, "init", "-q")
+			if err := os.WriteFile(filepath.Join(repo, "README"), []byte("hi\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if tt.command != "" {
+				if err := gate.WriteConfig(repo, gate.Config{Gate: gate.Gate{Command: tt.command}}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			gitOut(t, repo, "add", "-A")
+			gitOut(t, repo, "commit", "-q", "-m", "init")
+			t.Chdir(repo)
+			if tt.name == "cached pass" {
+				if err := run([]string{"gate"}); err != nil {
+					t.Fatalf("first run: %v", err)
+				}
+			}
+
+			err := run(append([]string{"gate"}, tt.args...))
+			got := 0
+			if err != nil {
+				var ec exitCode
+				if !errors.As(err, &ec) {
+					t.Fatalf("run returned a non-exit error: %v", err)
+				}
+				got = int(ec)
+			}
+			if got != tt.want {
+				t.Errorf("exit code = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGateCommandOutsideRepo(t *testing.T) {
+	isolateGit(t)
+	t.Chdir(t.TempDir())
+	var ec exitCode
+	if err := run([]string{"gate"}); !errors.As(err, &ec) || ec != 2 {
+		t.Fatalf("run(gate) outside a repo = %v, want exit 2", err)
 	}
 }

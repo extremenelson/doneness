@@ -982,10 +982,12 @@ Effort assumption: tests ~50x, features ~30x, architecture ~5x human÷CC; realis
   - Files: internal/gate/config.go, internal/gate/hookcmd.go (+ tests)
   - Verify: `LoadConfig(WriteConfig(c)) == c`; `IsGateHook(HookCommand(p,b))`
   - Result (2026-11-07): internal/gate/config.go and hookcmd.go. `HookCommand(bin, hookTimeout)` owns the 60s minimum and the 30s budget margin. Tests run the generated hook through `sh` against a fake binary (absolute path, path with spaces and quotes, PATH lookup), check missing-binary output is one JSON object with exit 0, and check strict config decoding. Mutation check caught 5/5 (quote escaping, budget margin, regex anchoring, unknown-key rejection, missing binary blocking).
-- [ ] **T5 (P1, human: ~3 days / CC: ~2h)** — gate — Core: absolute-path seeded tree hash, machine flock slots, sh -c runner (pgroup, CI=1, stdin null, inherited slot fd, Pdeathsig), guard, PASS-only notes with retry, last-red state, exit codes 0-4, cache key incl. version+GOOS/GOARCH
+- [x] **T5 (P1, human: ~3 days / CC: ~2h)** — gate — Core: absolute-path seeded tree hash, machine flock slots, sh -c runner (pgroup, CI=1, stdin null, inherited slot fd, Pdeathsig), guard, PASS-only notes with retry, last-red state, exit codes 0-4, cache key incl. version+GOOS/GOARCH
   - Surfaced by: F2; A2 / D5; C1 / D8; OV4 / D13; OV5 / D14; OV8 / D16; OV13 / D18; C3 / D10
   - Files: internal/gate/ (treehash.go, lock.go, run.go, receipt.go, gate.go + tests)
   - Verify: test plan Edge Cases 1-7 and Critical Path exit-code table
+  - Result (2026-11-07): internal/gate {treehash,slots,runner,receipt,gate,paths}.go plus a minimal `newproj gate [--budget D] [--no-cache]` route (gate_cmd.go); `gate` is now reserved as a subcommand name. 28 gate tests + CLI exit-code tests green under -race; cached pass on 10k files measured at 39ms. Mutation check caught 9/9 (the shell-only kill is masked by the post-exit group reap; removing both fails two tests).
+  - Two bugs the tests found and fixed: (1) `git notes add` does not compare-and-swap the notes ref, so concurrent passes in different worktrees silently lost receipts (5/5 runs); receipt writes are now serialized with a flock in the git common dir and read back after writing. (2) A background process left by the check held the output pipe, so the gate waited for it (30s in the test); `cmd.WaitDelay` (500ms) bounds that, then the leftover group is killed.
 - [ ] **T6 (P1, human: ~1 day / CC: ~45min)** — gate — Hook mode: JSON channel, stdin cwd resolution, session counter, budget, systemMessage warnings
   - Surfaced by: A3 / D7; F3; spec R3-1/2/5 fixes
   - Files: internal/gate/hook.go (+ tests)
