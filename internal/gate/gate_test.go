@@ -23,7 +23,11 @@ func isolate(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()
 	cfg := filepath.Join(home, "gitconfig")
-	body := "[user]\n\tname = gate test\n\temail = test@example.invalid\n[commit]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n"
+	// gc.auto = 0: a large commit (TestCachedPassIsFast) would otherwise
+	// start a detached auto-gc that writes into .git while the test's temp
+	// dir is being removed.
+	body := "[user]\n\tname = gate test\n\temail = test@example.invalid\n[commit]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n" +
+		"[gc]\n\tauto = 0\n[maintenance]\n\tauto = false\n"
 	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

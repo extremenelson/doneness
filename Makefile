@@ -5,7 +5,7 @@ SCRIPTS := $(wildcard bin/*)
 SCRIPT_DIR ?= $(HOME)/bin
 
 .DEFAULT_GOAL := help
-.PHONY: help build run test cover lint fmt tidy check install install-scripts clean
+.PHONY: help build run test cover lint fmt tidy fix check install install-scripts clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -26,13 +26,21 @@ cover: ## Run tests and open an HTML coverage report
 lint: ## Run golangci-lint (includes go vet and staticcheck)
 	golangci-lint run
 
-fmt: ## Format code and fix imports
+fmt: ## Format code and fix imports (rewrites files)
 	golangci-lint fmt
 
-tidy: ## Sync go.mod and go.sum with the imports in the code
+tidy: ## Sync go.mod and go.sum with the imports in the code (rewrites files)
 	go mod tidy
 
-check: fmt tidy lint test ## Everything that must pass before a commit
+fix: fmt tidy ## Rewrite formatting and go.mod/go.sum; run when check complains
+
+# check only verifies, so newproj's own done-gate (.newproj.json) can run it
+# and trust that a green tree is the tree that was tested.
+check: ## Everything that must pass before a commit (read-only)
+	golangci-lint fmt --diff
+	go mod tidy -diff
+	golangci-lint run
+	go test -race ./...
 
 install: ## Install newproj into $(go env GOBIN) or ~/go/bin
 	go install .
