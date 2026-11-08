@@ -61,6 +61,26 @@ func (c Config) Hash() string {
 	return hex.EncodeToString(sum[:])
 }
 
+// EncodeJSON encodes v for files people read: no HTML escaping (so "&&"
+// and ">" stay as written) and, when indent is set, two-space indentation
+// and a trailing newline. Config.Hash deliberately does not use it: the
+// hash's canonical form must never change.
+func EncodeJSON(v any, indent bool) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if indent {
+		enc.SetIndent("", "  ")
+	}
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	if !indent {
+		return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+	}
+	return buf.Bytes(), nil
+}
+
 // LoadConfig reads and validates ConfigFile in the repository rooted at root.
 // Unknown keys are errors, so a misspelled key cannot silently disable a
 // setting.
@@ -100,11 +120,10 @@ func WriteConfig(root string, c Config) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	b, err := json.MarshalIndent(c, "", "  ")
+	b, err := EncodeJSON(c, true)
 	if err != nil {
 		return err
 	}
-	b = append(b, '\n')
 
 	tmp, err := os.CreateTemp(root, ConfigFile+".tmp-*")
 	if err != nil {

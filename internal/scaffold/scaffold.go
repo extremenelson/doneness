@@ -7,7 +7,6 @@ package scaffold
 
 import (
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -78,7 +77,7 @@ func Create(cfg Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	quoted, err := json.Marshal(hook)
+	quoted, err := gate.EncodeJSON(hook, false)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package gate
 
 import (
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -51,9 +50,9 @@ func HookCommand(bin string, hookTimeout time.Duration) (string, error) {
 		return "", fmt.Errorf("gate binary path %q is not absolute", bin)
 	}
 
-	notice, err := json.Marshal(map[string]string{
+	notice, err := EncodeJSON(map[string]string{
 		"systemMessage": "done-gate NOT enforced: " + missing,
-	})
+	}, false)
 	if err != nil {
 		return "", err
 	}

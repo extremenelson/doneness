@@ -270,8 +270,8 @@ func TestReceiptsAndCache(t *testing.T) {
 	ctx := context.Background()
 
 	first := mustRun(t, ctx, opts(root))
-	if first.Outcome != Pass {
-		t.Fatalf("first run = %s (%s)", first.Outcome, first.Detail)
+	if first.Outcome != Pass || first.Warning != "" {
+		t.Fatalf("first run = %s (detail %q, warning %q)", first.Outcome, first.Detail, first.Warning)
 	}
 	r, err := ReadReceipt(ctx, root, first.Tree)
 	if err != nil || r == nil {
@@ -283,24 +283,24 @@ func TestReceiptsAndCache(t *testing.T) {
 	}
 
 	if res := mustRun(t, ctx, opts(root)); res.Outcome != Cached || runs() != 1 {
-		t.Errorf("second run = %s with %d check runs, want cached and 1", res.Outcome, runs())
+		t.Errorf("second run = %s with %d check runs, want cached and 1 (detail %q, warning %q)", res.Outcome, runs(), res.Detail, res.Warning)
 	}
 
 	o := opts(root)
 	o.NoCache = true
 	if res := mustRun(t, ctx, o); res.Outcome != Pass || runs() != 2 {
-		t.Errorf("--no-cache run = %s with %d check runs, want pass and 2", res.Outcome, runs())
+		t.Errorf("--no-cache run = %s with %d check runs, want pass and 2 (detail %q, warning %q)", res.Outcome, runs(), res.Detail, res.Warning)
 	}
 
 	o = opts(root)
 	o.Version = "other"
 	if res := mustRun(t, ctx, o); res.Outcome != Pass || runs() != 3 {
-		t.Errorf("new gate version = %s with %d runs, want a fresh pass", res.Outcome, runs())
+		t.Errorf("new gate version = %s with %d runs, want a fresh pass (detail %q, warning %q)", res.Outcome, runs(), res.Detail, res.Warning)
 	}
 
 	write(t, filepath.Join(root, "tracked.txt"), "v2\n")
 	if res := mustRun(t, ctx, opts(root)); res.Outcome != Pass || runs() != 4 {
-		t.Errorf("edited tree = %s with %d runs, want a fresh pass", res.Outcome, runs())
+		t.Errorf("edited tree = %s with %d runs, want a fresh pass (detail %q, warning %q)", res.Outcome, runs(), res.Detail, res.Warning)
 	}
 
 	// Changing the command changes the config hash (and the tree, since the
@@ -309,7 +309,7 @@ func TestReceiptsAndCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res := mustRun(t, ctx, opts(root)); res.Outcome != Pass || runs() != 5 {
-		t.Errorf("new command = %s with %d runs, want a fresh pass", res.Outcome, runs())
+		t.Errorf("new command = %s with %d runs, want a fresh pass (detail %q, warning %q)", res.Outcome, runs(), res.Detail, res.Warning)
 	}
 }
 
@@ -666,5 +666,44 @@ func TestCachedPassIsFast(t *testing.T) {
 	t.Logf("cached pass on 10k files took %v", el)
 	if el > time.Second {
 		t.Errorf("cached pass took %v, want under 1s", el)
+	}
+}
+
+// TestTreeHashSameSecondRewrite: a same-size rewrite whose mtime matches the
+// cached entry is only caught by git's "racy git" rule, which compares file
+// mtimes with the index file's own mtime. TreeHash copies the index, so the
+// copy must keep the original mtime; with a fresh mtime, git trusts the stale
+// entry and hashes the old content.
+func TestTreeHashSameSecondRewrite(t *testing.T) {
+	isolate(t)
+	root := newRepo(t, "true")
+	ctx := context.Background()
+	past := time.Now().Add(-time.Hour).Truncate(time.Second)
+	file := filepath.Join(root, "tracked.txt")
+
+	// Re-stage tracked.txt with an mtime of `past`, and give the index the
+	// same mtime, so its entry is racily clean.
+	if err := os.Chtimes(file, past, past); err != nil {
+		t.Fatal(err)
+	}
+	run(t, root, "git", "update-index", "--really-refresh")
+	index, err := git(ctx, root, nil, nil, "rev-parse", "--path-format=absolute", "--git-path", "index")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(index, past, past); err != nil {
+		t.Fatal(err)
+	}
+
+	write(t, file, "v2\n") // same size as "v1\n"
+	if err := os.Chtimes(file, past, past); err != nil {
+		t.Fatal(err)
+	}
+
+	tree := hash(t, root)
+	got := run(t, root, "git", "rev-parse", tree+":tracked.txt")
+	want := run(t, root, "git", "hash-object", "tracked.txt")
+	if got != want {
+		t.Fatalf("tree records tracked.txt as %s, want the on-disk content %s (stale cached entry trusted)", got, want)
 	}
 }

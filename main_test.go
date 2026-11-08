@@ -681,3 +681,102 @@ func TestGateStatusCommand(t *testing.T) {
 		t.Errorf("rev without --status: exit %d, want 2", c)
 	}
 }
+
+// TestAdoptCommand drives `newproj adopt` on a plain repository: dry run
+// writes nothing, --apply writes the files and runs the gate (READY / NOT
+// READY), and errors exit 2.
+func TestAdoptCommand(t *testing.T) {
+	setup := func(t *testing.T, check string) string {
+		t.Helper()
+		isolateGit(t)
+		t.Setenv("XDG_STATE_HOME", t.TempDir())
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("NEWPROJ_SLOTS", "1")
+		repo, _ := filepath.EvalSymlinks(t.TempDir())
+		gitOut(t, repo, "init", "-q")
+		if err := os.WriteFile(filepath.Join(repo, "Makefile"), []byte("check:\n\t"+check+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		gitOut(t, repo, "add", "-A")
+		gitOut(t, repo, "commit", "-q", "-m", "init")
+		t.Chdir(repo)
+		return repo
+	}
+	code := func(t *testing.T, err error) int {
+		t.Helper()
+		var ec exitCode
+		if err == nil {
+			return 0
+		}
+		if !errors.As(err, &ec) {
+			t.Fatalf("non-exit error: %v", err)
+		}
+		return int(ec)
+	}
+
+	t.Run("dry run writes nothing", func(t *testing.T) {
+		repo := setup(t, "true")
+		var err error
+		out := captureStdout(t, func() { err = run([]string{"adopt"}) })
+		if c := code(t, err); c != 0 {
+			t.Fatalf("exit %d", c)
+		}
+		if !strings.Contains(out, "gate command: make check") || !strings.Contains(out, "dry run: nothing was written") {
+			t.Errorf("output:\n%s", out)
+		}
+		if st := gitOut(t, repo, "status", "--porcelain", "--ignored"); st != "" {
+			t.Errorf("dry run changed the repo:\n%s", st)
+		}
+	})
+
+	t.Run("apply, gate green: READY and proven", func(t *testing.T) {
+		repo := setup(t, "true")
+		var err error
+		out := captureStdout(t, func() { err = run([]string{"adopt", "--apply"}) })
+		if c := code(t, err); c != 0 {
+			t.Fatalf("exit %d:\n%s", c, out)
+		}
+		if !strings.Contains(out, "READY: commit .newproj.json, CLAUDE.md so new worktrees inherit the gate.") {
+			t.Errorf("output:\n%s", out)
+		}
+		if _, err := gate.LoadConfig(repo); err != nil {
+			t.Errorf("config not written: %v", err)
+		}
+		rep, err := gate.Status(context.Background(), gate.StatusOptions{Root: repo})
+		if err != nil || !rep.Proven {
+			t.Errorf("after READY, status = %+v, %v; want proven", rep, err)
+		}
+	})
+
+	t.Run("apply, gate red: NOT READY, files kept", func(t *testing.T) {
+		repo := setup(t, "false")
+		var err error
+		out := captureStdout(t, func() { err = run([]string{"adopt", "--apply"}) })
+		if c := code(t, err); c != 1 {
+			t.Fatalf("exit %d, want 1:\n%s", c, out)
+		}
+		if !strings.Contains(out, "NOT READY: gate is failed") {
+			t.Errorf("output:\n%s", out)
+		}
+		if _, err := gate.LoadConfig(repo); err != nil {
+			t.Errorf("files not kept after NOT READY: %v", err)
+		}
+	})
+
+	t.Run("errors exit 2", func(t *testing.T) {
+		setup(t, "true")
+		devnull, _ := os.Open(os.DevNull)
+		stderr := os.Stderr
+		os.Stderr = devnull
+		defer func() { os.Stderr = stderr; _ = devnull.Close() }()
+		for _, args := range [][]string{{"adopt", "--nope"}, {"adopt", "extra"}, {"adopt", "--hook-timeout", "30s"}} {
+			if c := code(t, run(args)); c != 2 {
+				t.Errorf("run(%q) exit %d, want 2", args, c)
+			}
+		}
+		t.Chdir(t.TempDir())
+		if c := code(t, run([]string{"adopt"})); c != 2 {
+			t.Errorf("outside a repo: exit %d, want 2", c)
+		}
+	})
+}

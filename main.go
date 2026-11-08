@@ -32,6 +32,7 @@ const usage = `usage: newproj <command> [flags]
 
 commands:
   new <name>   scaffold a new Go project (newproj new -h for flags)
+  adopt        add the done-gate to this repository (newproj adopt -h for flags)
   gate         run this repository's done-gate (newproj gate -h for flags)
 `
 
@@ -48,6 +49,8 @@ func run(args []string) error {
 		return runNew(args[1:])
 	case "gate":
 		return runGate(args[1:])
+	case "adopt":
+		return runAdopt(args[1:])
 	case "help", "-h", "-help", "--help":
 		_, _ = io.WriteString(os.Stdout, usage)
 		return nil

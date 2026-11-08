@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"time"
 )
 
 // TreeHash returns the git tree id of the work tree rooted at root as it is
@@ -29,13 +30,16 @@ func TreeHash(ctx context.Context, root string) (string, error) {
 	tmpPath := tmp.Name()
 	defer func() { _ = os.Remove(tmpPath) }()
 
+	var srcMtime time.Time
 	if src, err := os.Open(index); err == nil {
+		fi, serr := src.Stat()
 		_, cerr := io.Copy(tmp, src)
 		_ = src.Close()
-		if cerr != nil {
+		if err := errors.Join(serr, cerr); err != nil {
 			_ = tmp.Close()
-			return "", cerr
+			return "", err
 		}
+		srcMtime = fi.ModTime()
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		_ = tmp.Close()
 		return "", err
@@ -54,6 +58,13 @@ func TreeHash(ctx context.Context, root string) (string, error) {
 		if err := os.Remove(tmpPath); err != nil {
 			return "", err
 		}
+	} else if err := os.Chtimes(tmpPath, srcMtime, srcMtime); err != nil {
+		// Git trusts an entry's cached stat data only if the file's mtime
+		// is older than the index file's own mtime ("racy git"). A fresh
+		// copy has mtime now, which would make git trust stale entries for
+		// files rewritten (same size) within the same second; keep the
+		// original index's mtime so the racy check still works.
+		return "", err
 	}
 
 	env := []string{"GIT_INDEX_FILE=" + tmpPath}

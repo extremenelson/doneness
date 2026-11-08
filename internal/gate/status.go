@@ -195,7 +195,7 @@ func hookStatus(ctx context.Context, root string) ([]string, error) {
 		filepath.Join(root, ".claude", "settings.json"),
 		filepath.Join(root, ".claude", "settings.local.json"),
 	}
-	if main, err := mainCheckout(ctx, root); err == nil && main != root {
+	if main, err := MainCheckout(ctx, root); err == nil && main != root {
 		// Claude Code reads a worktree's local settings from the main checkout.
 		files = append(files, filepath.Join(main, ".claude", "settings.local.json"))
 	}
@@ -230,9 +230,10 @@ func hookStatus(ctx context.Context, root string) ([]string, error) {
 	return problems, nil
 }
 
-// mainCheckout is the repository's main working tree (the first entry of
-// `git worktree list`), or root when the repository is bare.
-func mainCheckout(ctx context.Context, root string) (string, error) {
+// MainCheckout is the repository's main working tree (the first entry of
+// `git worktree list`), or root when the repository is bare. Claude Code
+// reads a linked worktree's .claude/settings.local.json from there.
+func MainCheckout(ctx context.Context, root string) (string, error) {
 	out, err := git(ctx, root, nil, nil, "worktree", "list", "--porcelain")
 	if err != nil {
 		return "", err
