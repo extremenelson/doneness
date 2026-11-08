@@ -20,10 +20,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false # no dependencies, so no go.sum to key a cache on
+      # Runs the linter (with PR annotations) and leaves it on PATH for
+      # `make check`.
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.15.0
-          install-only: true
       # The scaffold tests use `git worktree add --orphan` (git 2.42+).
       - run: git --version
       - run: make check

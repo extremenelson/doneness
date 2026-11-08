@@ -36,6 +36,12 @@ func isolate(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(home, "state"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	t.Setenv(SlotsEnv, "")
+	// CI runners set CI=true; the gate keeps an existing value, so tests that
+	// check the CI=1 default need it unset (t.Setenv restores it afterwards).
+	t.Setenv("CI", "")
+	if err := os.Unsetenv("CI"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func run(t *testing.T, dir string, name string, args ...string) string {
