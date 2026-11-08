@@ -61,17 +61,37 @@ func HookCommand(bin string, hookTimeout time.Duration) (string, error) {
 		check, shellQuote(string(notice)), invoke, budget), nil
 }
 
-// gateHookRE matches a gate invocation at the start of a shell command or
-// after a command separator: BinaryName on PATH, or any path (quoted or
-// not) whose last element is BinaryName, followed by `gate --hook`.
-var gateHookRE = regexp.MustCompile(
-	`(?:^|[;&|]\s*)(?:'(?:[^']|'\\'')*/` + BinaryName + `'|(?:\S*/)?` + BinaryName + `)\s+gate\s+--hook(?:\s|$)`)
+// hookBinaryRE matches a gate invocation at the start of a shell command or
+// after a command separator, capturing the binary: BinaryName on PATH, or
+// any path (single-quoted as HookCommand writes it, or bare) whose last
+// element is BinaryName, followed by `gate --hook`.
+var hookBinaryRE = regexp.MustCompile(
+	`(?:^|[;&|]\s*)('(?:[^']|'\\'')*/` + BinaryName + `'|(?:\S*/)?` + BinaryName + `)\s+gate\s+--hook(?:\s|$)`)
+
+// HookBinary returns the gate binary a hook command invokes: an absolute
+// path, or "" when it looks BinaryName up on PATH. ok is false when cmd is
+// not a gate hook.
+func HookBinary(cmd string) (path string, ok bool) {
+	m := hookBinaryRE.FindStringSubmatch(strings.TrimSpace(cmd))
+	if m == nil {
+		return "", false
+	}
+	bin := m[1]
+	if strings.HasPrefix(bin, "'") {
+		bin = strings.ReplaceAll(bin[1:len(bin)-1], `'\''`, "'")
+	}
+	if bin == BinaryName {
+		return "", true
+	}
+	return bin, true
+}
 
 // IsGateHook reports whether a hook command runs the gate. It recognizes
 // every command HookCommand produces and a hand-written
 // `newproj gate --hook`.
 func IsGateHook(cmd string) bool {
-	return gateHookRE.MatchString(strings.TrimSpace(cmd))
+	_, ok := HookBinary(cmd)
+	return ok
 }
 
 // shellQuote quotes s for POSIX sh: it wraps s in single quotes and, for

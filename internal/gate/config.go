@@ -73,7 +73,12 @@ func LoadConfig(root string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	return ParseConfig(b)
+}
 
+// ParseConfig decodes and validates the contents of a ConfigFile (for
+// example one read from a commit with `git show`).
+func ParseConfig(b []byte) (Config, error) {
 	var c Config
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()

@@ -612,3 +612,72 @@ func TestScaffoldGateWiring(t *testing.T) {
 		t.Error("Makefile check still depends on the rewriting fmt/tidy targets")
 	}
 }
+
+// captureStdout runs f with os.Stdout redirected and returns what it wrote.
+func captureStdout(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = w
+	f()
+	os.Stdout = stdout
+	_ = w.Close()
+	b, _ := io.ReadAll(r)
+	return string(b)
+}
+
+// TestGateStatusCommand: `newproj gate --status [<rev>]` exits 0 when proven,
+// 1 when not, 2 on error, and never runs the check.
+func TestGateStatusCommand(t *testing.T) {
+	isolateGit(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("NEWPROJ_SLOTS", "1")
+	dir := scaffoldDemo(t, "-flat")
+	t.Chdir(dir)
+	code := func(err error) int {
+		var ec exitCode
+		if err == nil {
+			return 0
+		}
+		if !errors.As(err, &ec) {
+			t.Fatalf("non-exit error: %v", err)
+		}
+		return int(ec)
+	}
+
+	var err error
+	out := captureStdout(t, func() { err = run([]string{"gate", "--status"}) })
+	if c := code(err); c != 1 || !strings.Contains(out, "working tree (tree ") || !strings.Contains(out, "  unproven") {
+		t.Errorf("before gating: exit %d, output:\n%s", c, out)
+	}
+
+	if err := gate.WriteConfig(dir, gate.Config{Gate: gate.Gate{Command: "true"}}); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, dir, "commit", "-q", "-am", "fast gate for the test")
+	if err := run([]string{"gate"}); err != nil {
+		t.Fatalf("gate: %v", err)
+	}
+	out = captureStdout(t, func() { err = run([]string{"gate", "--status"}) })
+	if c := code(err); c != 0 || !strings.Contains(out, `  PASS `) || !strings.Contains(out, `"true"`) || strings.Contains(out, "warning:") {
+		t.Errorf("after a pass: exit %d, output:\n%s", c, out)
+	}
+
+	out = captureStdout(t, func() { err = run([]string{"gate", "--status", "HEAD"}) })
+	if c := code(err); c != 0 || !strings.HasPrefix(out, "HEAD (tree ") {
+		t.Errorf("--status HEAD: exit %d, output:\n%s", c, out)
+	}
+	if c := code(run([]string{"gate", "--status", "no-such-rev"})); c != 2 {
+		t.Errorf("--status no-such-rev: exit %d, want 2", c)
+	}
+	if c := code(run([]string{"gate", "--status", "--hook"})); c != 2 {
+		t.Errorf("--status --hook: exit %d, want 2", c)
+	}
+	if c := code(run([]string{"gate", "HEAD"})); c != 2 {
+		t.Errorf("rev without --status: exit %d, want 2", c)
+	}
+}
