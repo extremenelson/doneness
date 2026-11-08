@@ -386,9 +386,9 @@ func TestTimeoutKillsProcessGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
-	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+	if !processGone(pid) {
 		_ = syscall.Kill(pid, syscall.SIGKILL)
-		t.Errorf("grandchild sleep (pid %d) survived the timeout (kill -0: %v)", pid, err)
+		t.Errorf("grandchild sleep (pid %d) survived the timeout", pid)
 	}
 	if lr, _ := ReadLastRed(state, res.Tree); lr == nil || lr.Kind != "timed-out" {
 		t.Errorf("last red = %+v, want timed-out", lr)
@@ -408,8 +408,7 @@ func TestLeftoverBackgroundProcessKilled(t *testing.T) {
 	}
 	b, _ := os.ReadFile(pidFile)
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
-	time.Sleep(50 * time.Millisecond)
-	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+	if !processGone(pid) {
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 		t.Errorf("background process left by the check survived (pid %d)", pid)
 	}
@@ -715,5 +714,26 @@ func TestTreeHashSameSecondRewrite(t *testing.T) {
 	want := run(t, root, "git", "hash-object", "tracked.txt")
 	if got != want {
 		t.Fatalf("tree records tracked.txt as %s, want the on-disk content %s (stale cached entry trusted)", got, want)
+	}
+}
+
+// processGone reports whether pid has exited, waiting up to 3s. A killed
+// orphan is reaped by init (or a subreaper) asynchronously; until then it is
+// a zombie, which kill -0 still finds but which holds no files or CPU, so
+// zombie state counts as gone.
+func processGone(pid int) bool {
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if err := syscall.Kill(pid, 0); errors.Is(err, syscall.ESRCH) {
+			return true
+		}
+		if out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output(); err == nil &&
+			strings.HasPrefix(strings.TrimSpace(string(out)), "Z") {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
