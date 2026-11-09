@@ -19,11 +19,11 @@ import (
 )
 
 // ConfigFile is the gate config's name, at the repository's top level.
-const ConfigFile = ".newproj.json"
+const ConfigFile = ".doneness.json"
 
 var (
 	// ErrNoConfig means the repository has no ConfigFile.
-	ErrNoConfig = errors.New("no " + ConfigFile + " (run `newproj adopt`)")
+	ErrNoConfig = errors.New("no " + ConfigFile + " (run `doneness adopt`)")
 	// ErrEmptyCommand means the config names no check command.
 	ErrEmptyCommand = errors.New(ConfigFile + ": gate.command is empty")
 )

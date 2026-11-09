@@ -16,14 +16,14 @@
 #   scripts/t1-worktree-hook-probe.sh report [--dir DIR]
 #   scripts/t1-worktree-hook-probe.sh clean [--dir DIR]
 #
-# Everything lives under DIR (default: ${TMPDIR:-/tmp}/newproj-t1-probe).
+# Everything lives under DIR (default: ${TMPDIR:-/tmp}/doneness-t1-probe).
 # Nothing outside DIR is written. Your global Claude settings are untouched.
 set -euo pipefail
 
 die() { echo "FAIL  $*" >&2; exit 1; }
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
-dir="${TMPDIR:-/tmp}"; dir="${dir%/}/newproj-t1-probe"
+dir="${TMPDIR:-/tmp}"; dir="${dir%/}/doneness-t1-probe"
 block=0
 while [ $# -gt 0 ]; do
   case "$1" in

@@ -10,15 +10,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/extremenelson/newproj/internal/scaffold"
+	"github.com/extremenelson/doneness/internal/scaffold"
 )
 
 // prefixEnv sets the module path prefix when -prefix is not given.
-const prefixEnv = "NEWPROJ_PREFIX"
+const prefixEnv = "DONENESS_PREFIX"
 
 var validName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
-// runNew is `newproj new [flags] <name>`.
+// runNew is `doneness new [flags] <name>`.
 func runNew(args []string) error {
 	cfg, err := parseArgs(args)
 	if errors.Is(err, flag.ErrHelp) {
@@ -35,9 +35,9 @@ func runNew(args []string) error {
 }
 
 func parseArgs(args []string) (scaffold.Config, error) {
-	fl := flag.NewFlagSet("newproj new", flag.ContinueOnError)
+	fl := flag.NewFlagSet("doneness new", flag.ContinueOnError)
 	fl.Usage = func() {
-		_, _ = fmt.Fprintln(fl.Output(), "usage: newproj new [flags] <name>\n\nflags:")
+		_, _ = fmt.Fprintln(fl.Output(), "usage: doneness new [flags] <name>\n\nflags:")
 		fl.PrintDefaults()
 	}
 	modPrefix := fl.String("prefix", "", "module path prefix (default: $"+prefixEnv+", else github.com/<git config github.user>)")
@@ -77,7 +77,7 @@ func parseArgs(args []string) (scaffold.Config, error) {
 }
 
 // modulePrefix picks the module path prefix: the -prefix flag, else
-// $NEWPROJ_PREFIX, else github.com/<git config github.user>.
+// $DONENESS_PREFIX, else github.com/<git config github.user>.
 func modulePrefix(flagValue string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil

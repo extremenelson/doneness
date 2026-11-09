@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/extremenelson/newproj/internal/gate"
+	"github.com/extremenelson/doneness/internal/gate"
 )
 
 // hookEntry is the Stop-hook object adopt installs.

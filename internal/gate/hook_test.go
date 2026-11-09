@@ -54,7 +54,7 @@ func TestHookRedBlocksTwiceThenNotDone(t *testing.T) {
 			t.Fatalf("attempt %d = %+v, want block", attempt, resp)
 		}
 		for _, want := range []string{
-			"newproj gate is red (failed)",
+			"doneness check is red (failed)",
 			fmt.Sprintf("Attempt %d of 3", attempt),
 			"Check: echo \"result:",
 			"Last output:\nresult: 42", // the check's output, not its command text

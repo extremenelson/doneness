@@ -127,7 +127,7 @@ func TestStatusStaleReceipts(t *testing.T) {
 		want   string
 	}{
 		{"config", func(r *Receipt) { r.Command, r.ConfigHash = "make other", "x" }, "config drift"},
-		{"version", func(r *Receipt) { r.Version = "v9" }, "made by newproj v9, this is test"},
+		{"version", func(r *Receipt) { r.Version = "v9" }, "made by doneness v9, this is test"},
 		{"platform", func(r *Receipt) { r.GOOS = "plan9" }, "made on plan9/"},
 	}
 	for _, tt := range tests {
@@ -291,7 +291,7 @@ func TestDefaultBranch(t *testing.T) {
 }
 
 func TestHookBinary(t *testing.T) {
-	for _, bin := range []string{"", "/usr/local/bin/newproj", "/opt/it's here/newproj"} {
+	for _, bin := range []string{"", "/usr/local/bin/doneness", "/opt/it's here/doneness"} {
 		cmd, err := HookCommand(bin, 600*time.Second)
 		if err != nil {
 			t.Fatal(err)
@@ -305,10 +305,10 @@ func TestHookBinary(t *testing.T) {
 		cmd, want string
 		ok        bool
 	}{
-		{"newproj gate --hook", "", true},
-		{"/x/y/newproj gate --hook --budget 30s", "/x/y/newproj", true},
+		{"doneness hook", "", true},
+		{"/x/y/doneness hook --budget 30s", "/x/y/doneness", true},
 		{"make check", "", false},
-		{"echo newproj gate --hook", "", false},
+		{"echo doneness hook", "", false},
 	}
 	for _, tt := range tests {
 		if got, ok := HookBinary(tt.cmd); got != tt.want || ok != tt.ok {

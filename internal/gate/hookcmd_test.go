@@ -77,7 +77,7 @@ func TestHookCommandRunsGate(t *testing.T) {
 				t.Fatal(err)
 			}
 			budget := int((tt.timeout - 30*time.Second) / time.Second)
-			want := "gate\n--hook\n--budget\n" + strconv.Itoa(budget) + "s\n"
+			want := "hook\n--budget\n" + strconv.Itoa(budget) + "s\n"
 			if string(args) != want {
 				t.Errorf("gate args = %q, want %q", args, want)
 			}
@@ -89,9 +89,9 @@ func TestHookCommandMissingBinaryWarnsAndAllows(t *testing.T) {
 	tests := []struct {
 		name, bin, wantMsg string
 	}{
-		{name: "absolute path gone", bin: "/nonexistent/dir/newproj", wantMsg: "done-gate NOT enforced: /nonexistent/dir/newproj is missing"},
-		{name: "not on PATH", bin: "", wantMsg: "done-gate NOT enforced: newproj is not on PATH"},
-		{name: "path needing JSON escapes", bin: `/tmp/a"b\c/newproj`, wantMsg: `done-gate NOT enforced: /tmp/a"b\c/newproj is missing`},
+		{name: "absolute path gone", bin: "/nonexistent/dir/doneness", wantMsg: "done-gate NOT enforced: /nonexistent/dir/doneness is missing"},
+		{name: "not on PATH", bin: "", wantMsg: "done-gate NOT enforced: doneness is not on PATH"},
+		{name: "path needing JSON escapes", bin: `/tmp/a"b\c/doneness`, wantMsg: `done-gate NOT enforced: /tmp/a"b\c/doneness is missing`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -124,13 +124,13 @@ func TestHookCommandRejects(t *testing.T) {
 	if _, err := HookCommand("", MinHookTimeout-time.Second); err == nil {
 		t.Error("accepted a timeout below the minimum")
 	}
-	if _, err := HookCommand("bin/newproj", time.Hour); err == nil {
+	if _, err := HookCommand("bin/doneness", time.Hour); err == nil {
 		t.Error("accepted a relative binary path")
 	}
 }
 
 func TestIsGateHook(t *testing.T) {
-	for _, bin := range []string{"", "/Users/me/go/bin/newproj", "/opt/it's here/newproj"} {
+	for _, bin := range []string{"", "/Users/me/go/bin/doneness", "/opt/it's here/doneness"} {
 		cmd, err := HookCommand(bin, 1800*time.Second)
 		if err != nil {
 			t.Fatal(err)
@@ -144,18 +144,19 @@ func TestIsGateHook(t *testing.T) {
 		cmd  string
 		want bool
 	}{
-		{"newproj gate --hook", true},
-		{"newproj gate --hook --budget 570s", true},
-		{"  /usr/local/bin/newproj gate --hook", true},
-		{"cd repo && newproj gate --hook", true},
+		{"doneness hook", true},
+		{"doneness hook --budget 570s", true},
+		{"  /usr/local/bin/doneness hook", true},
+		{"cd repo && doneness hook", true},
 		{"", false},
 		{"make check", false},
-		{"newproj gate", false},
-		{"newproj gate --hookish", false},
-		{"newproj new demo", false},
-		{"echo newproj gate --hook", false},
-		{"echo 'newproj gate --hook'", false},
-		{"/usr/bin/not-newproj gate --hook", false},
+		{"doneness check", false},
+		{"doneness hookish", false},
+		{"doneness gate --hook", false},
+		{"doneness new demo", false},
+		{"echo doneness hook", false},
+		{"echo 'doneness hook'", false},
+		{"/usr/bin/not-doneness hook", false},
 		{"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-check.sh", false},
 	}
 	for _, tt := range tests {

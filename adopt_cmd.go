@@ -11,18 +11,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/extremenelson/newproj/internal/adopt"
-	"github.com/extremenelson/newproj/internal/gate"
+	"github.com/extremenelson/doneness/internal/adopt"
+	"github.com/extremenelson/doneness/internal/gate"
 )
 
-// runAdopt is `newproj adopt`: retrofit the current repository with the
+// runAdopt is `doneness adopt`: retrofit the current repository with the
 // done-gate. It prints a plan (dry run) unless --apply is given. Exit status:
 // 0 dry run or READY, 1 NOT READY (applied, but the gate is red), 2 usage or
 // setup error.
 func runAdopt(args []string) error {
-	fl := flag.NewFlagSet("newproj adopt", flag.ContinueOnError)
+	fl := flag.NewFlagSet("doneness adopt", flag.ContinueOnError)
 	fl.Usage = func() {
-		_, _ = fmt.Fprintln(fl.Output(), "usage: newproj adopt [flags]\n\n"+
+		_, _ = fmt.Fprintln(fl.Output(), "usage: doneness adopt [flags]\n\n"+
 			"Detects this repository's check command and shows what adopting the done-gate\n"+
 			"would change. Nothing is written unless --apply is given; nothing is committed.\n"+
 			"Exit status: 0 plan shown or READY, 1 NOT READY, 2 error.\n\nflags:")
@@ -89,7 +89,7 @@ func runAdopt(args []string) error {
 	}
 	if !res.Outcome.Passed() {
 		fmt.Printf("\nNOT READY: gate is %s: %s\n", res.Outcome, res.Detail)
-		fmt.Println("The files stay written: fix the check (or pass --cmd) and run `newproj gate`.")
+		fmt.Println("The files stay written: fix the check (or pass --cmd) and run `doneness check`.")
 		return exitCode(1)
 	}
 	toCommit := []string{gate.ConfigFile}

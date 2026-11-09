@@ -12,26 +12,26 @@ import (
 )
 
 // stateDir is where machine-local gate state lives (slot locks, last red
-// outcomes): $XDG_STATE_HOME/newproj, else ~/.local/state/newproj.
+// outcomes): $XDG_STATE_HOME/doneness, else ~/.local/state/doneness.
 func stateDir() (string, error) {
 	return xdgDir("XDG_STATE_HOME", ".local/state")
 }
 
-// configDir is where machine-wide gate settings live: $XDG_CONFIG_HOME/newproj,
-// else ~/.config/newproj.
+// configDir is where machine-wide gate settings live: $XDG_CONFIG_HOME/doneness,
+// else ~/.config/doneness.
 func configDir() (string, error) {
 	return xdgDir("XDG_CONFIG_HOME", ".config")
 }
 
 func xdgDir(env, fallback string) (string, error) {
 	if base := os.Getenv(env); filepath.IsAbs(base) {
-		return filepath.Join(base, "newproj"), nil
+		return filepath.Join(base, "doneness"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("locate home directory for %s: %w", env, err)
 	}
-	return filepath.Join(home, fallback, "newproj"), nil
+	return filepath.Join(home, fallback, "doneness"), nil
 }
 
 // gitError carries a failed git command's stderr.

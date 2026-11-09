@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/extremenelson/newproj/internal/gate"
+	"github.com/extremenelson/doneness/internal/gate"
 )
 
 func isolate(t *testing.T) {
@@ -96,10 +96,10 @@ func TestBuildDryRunWritesNothing(t *testing.T) {
 	for _, want := range []string{
 		"gate command: make check\n  (from Makefile target check)",
 		"other candidate: go vet ./... && go test ./...  (go.mod)",
-		"+++ b/.newproj.json",
+		"+++ b/.doneness.json",
 		"+++ b/.claude/settings.local.json",
 		"+++ b/CLAUDE.md",
-		"side effect: --apply runs `newproj gate` once",
+		"side effect: --apply runs `doneness check` once",
 		"side effect: append /.claude/settings.local.json to ",
 	} {
 		if !strings.Contains(out.String(), want) {
@@ -139,7 +139,7 @@ func TestBuildErrors(t *testing.T) {
 	if _, err := Build(ctx, Options{Root: bad, HookTimeout: time.Hour, Binary: fakeBin(t)}); err == nil || !strings.Contains(err.Error(), "fix it or pass --cmd") {
 		t.Errorf("invalid existing config: err = %v", err)
 	}
-	if _, err := Build(ctx, Options{Root: empty, Command: "true", HookTimeout: time.Hour, Binary: "relative/newproj"}); err == nil {
+	if _, err := Build(ctx, Options{Root: empty, Command: "true", HookTimeout: time.Hour, Binary: "relative/doneness"}); err == nil {
 		t.Error("local hook accepted a relative binary path")
 	}
 }
@@ -270,7 +270,7 @@ func TestLocalHookGoesToMainCheckout(t *testing.T) {
 func TestTemporaryBinaryWarning(t *testing.T) {
 	isolate(t)
 	root := repo(t, map[string]string{"Makefile": "check:\n\ttrue\n"})
-	p := build(t, Options{Root: root, Binary: filepath.Join(os.TempDir(), "go-build123", "b001", "exe", "newproj")})
+	p := build(t, Options{Root: root, Binary: filepath.Join(os.TempDir(), "go-build123", "b001", "exe", "doneness")})
 	if len(p.Warnings) == 0 || !strings.Contains(p.Warnings[0], "temporary build") {
 		t.Errorf("warnings = %q", p.Warnings)
 	}

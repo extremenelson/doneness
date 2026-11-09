@@ -66,7 +66,7 @@ func Hook(ctx context.Context, stdin io.Reader, o HookOptions) HookResponse {
 	if state == "" {
 		var err error
 		if state, err = stateDir(); err != nil {
-			return HookResponse{Decision: "block", Reason: "newproj gate: " + err.Error(),
+			return HookResponse{Decision: "block", Reason: "doneness: " + err.Error(),
 				SystemMessage: "done-gate error: " + err.Error()}
 		}
 	}
@@ -123,7 +123,7 @@ func Hook(ctx context.Context, stdin io.Reader, o HookOptions) HookResponse {
 	}
 
 	var reason strings.Builder
-	fmt.Fprintf(&reason, "newproj gate is red (%s), so this work is not done. Attempt %d of %d; after that the stop is allowed but reported as NOT DONE.\n", kind, n, MaxBlocks+1)
+	fmt.Fprintf(&reason, "doneness check is red (%s), so this work is not done. Attempt %d of %d; after that the stop is allowed but reported as NOT DONE.\n", kind, n, MaxBlocks+1)
 	if res.Command != "" {
 		fmt.Fprintf(&reason, "Check: %s\n", res.Command)
 	}

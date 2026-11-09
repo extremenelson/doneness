@@ -6,6 +6,7 @@ Repo: extremenelson/newproj
 Status: APPROVED
 Mode: Builder
 Amended: plan-eng-review 2026-11-07 applied D1-D18 to this text (see the Eng Review section at the end).
+Renamed 2026-11-09: the tool is now **doneness** (repo extremenelson/doneness). Commands were flattened: `newproj gate` → `doneness check`, `gate --status` → `doneness status`, `gate --hook` → `doneness hook`; `.newproj.json` → `.doneness.json`, `refs/notes/newproj-gate` → `refs/notes/doneness`, `NEWPROJ_*` → `DONENESS_*`, state/config dirs `newproj` → `doneness`. The text below keeps the original names as written at the time.
 
 ## Problem Statement
 

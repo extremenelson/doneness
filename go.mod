@@ -1,3 +1,3 @@
-module github.com/extremenelson/newproj
+module github.com/extremenelson/doneness
 
 go 1.24.7

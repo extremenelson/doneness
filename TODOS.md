@@ -2,21 +2,13 @@
 
 ## Product
 
-### Decide the public name before v0.1.0
-
-**What:** Pick the public name (module path, binary, repo) for the tool before the first tag.
-**Why:** "newproj" describes the old scaffolder, not an enforced done-gate for agents. Every adopted repo's hook command names the binary, so renaming later breaks them.
-**Pros:** Settles install paths and hook commands before they spread to other repos.
-**Cons:** A product decision, not code; it needs a short naming session (human ~1h).
-**Context:** /plan-eng-review D22 (2026-11-07). D15 writes the absolute binary path into local settings, so a rename after release forces `adopt --apply` again everywhere. See docs/designs/agent-ready-gate.md Open Question 6.
-**Depends on / blocked by:** Nothing. Must land before tagging v0.1.0.
-**Priority:** P1
+_No open product items._
 
 ## Gate
 
 ### Off-machine receipt verification (push notes + CI check)
 
-**What:** Push `refs/notes/newproj-gate` and add a GitHub Action that accepts a PR only when a PASS receipt matches its tree, OS and arch.
+**What:** Push `refs/notes/doneness` and add a GitHub Action that accepts a PR only when a PASS receipt matches its tree, OS and arch.
 **Why:** v1 receipts are local and advisory, so an agent with a shell could forge one. Verifying them in CI turns "done" into a guarantee that holds beyond one laptop (Approach B).
 **Pros:** Closes the main caveat in the design's guarantee section; CI can skip work already proven locally.
 **Cons:** Sizable (human ~1 week / CC ~3h); notes don't push by default, so this needs a choice between pushed notes and a commit trailer.
@@ -33,14 +25,14 @@
 **Pros:** Prebuilt binaries widen the audience past Go developers.
 **Cons:** Release plumbing to maintain (human ~2h / CC ~10min to start).
 **Context:** /plan-eng-review D1 deferred this out of v1; D19 tracked it. v0.1.0 ships as a plain tag. Start from goreleaser's Go template once the README demo exists.
-**Depends on / blocked by:** CI workflow (in v1) and the naming decision (P1 above).
+**Depends on / blocked by:** CI workflow (in v1, done). The naming decision is made (doneness).
 **Priority:** P2
 
 ## Workflow
 
-### Port wt-* and repo-adopt as a thin `newproj wt` layer
+### Port wt-* and repo-adopt as a thin `doneness wt` layer
 
-**What:** Port the bin/ helpers into an optional `newproj wt` subcommand: `wt done` calls `newproj gate` and refuses without a PASS receipt, and `--container` reuses repo-adopt's logic.
+**What:** Port the bin/ helpers into an optional `doneness wt` subcommand: `wt done` calls `doneness check` and refuses without a PASS receipt, and `--container` reuses repo-adopt's logic.
 **Why:** One binary for strangers (premise #4), and `wt done` is the natural place to require a receipt.
 **Pros:** The author's own loop gets a receipt-gated `wt done`; the bash helpers go away.
 **Cons:** Work that strangers using gtr may never touch (human ~2 days / CC ~1h).
@@ -49,3 +41,14 @@
 **Priority:** P3
 
 ## Completed
+
+### Decide the public name before v0.1.0
+
+**What:** Pick the public name (module path, binary, repo) for the tool before the first tag.
+**Why:** "newproj" describes the old scaffolder, not an enforced done-gate for agents. Every adopted repo's hook command names the binary, so renaming later breaks them.
+**Pros:** Settles install paths and hook commands before they spread to other repos.
+**Cons:** A product decision, not code; it needs a short naming session (human ~1h).
+**Context:** /plan-eng-review D22 (2026-11-07). D15 writes the absolute binary path into local settings, so a rename after release forces `adopt --apply` again everywhere. See docs/designs/agent-ready-gate.md Open Question 6.
+**Depends on / blocked by:** Nothing. Must land before tagging v0.1.0.
+**Priority:** P1
+**Completed:** 2026-11-09. Named **doneness** after two research rounds (donegate, notdone, doneproof and proofgate are taken by existing definition-of-done tools for agents; doneness was free on Homebrew, npm, crates, PyPI, GitHub and .dev). Commands flattened at the same time: `check`, `status`, `hook`, `adopt`, `new`.

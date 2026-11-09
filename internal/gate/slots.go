@@ -16,7 +16,7 @@ import (
 )
 
 // SlotsEnv overrides the machine-wide number of concurrent gate checks.
-const SlotsEnv = "NEWPROJ_SLOTS"
+const SlotsEnv = "DONENESS_SLOTS"
 
 // MachineConfigFile holds machine-wide gate settings, in configDir:
 // {"slots": N}.
@@ -26,7 +26,7 @@ const MachineConfigFile = "config.json"
 const slotPoll = 100 * time.Millisecond
 
 // SlotCount returns how many gate checks may run at once on this machine:
-// $NEWPROJ_SLOTS, else "slots" in the machine config file, else a quarter of
+// $DONENESS_SLOTS, else "slots" in the machine config file, else a quarter of
 // the CPUs (at least 1). Repositories cannot set it, so the cap holds across
 // every repository and worktree.
 func SlotCount() (int, error) {

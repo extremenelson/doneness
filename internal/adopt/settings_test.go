@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var testHook = hookEntry{Type: "command", Command: "newproj gate --hook --budget 1770s", Timeout: 1800}
+var testHook = hookEntry{Type: "command", Command: "doneness hook --budget 1770s", Timeout: 1800}
 
 // stopCommands decodes a settings file and returns every Stop hook command.
 func stopCommands(t *testing.T, b []byte) []string {
@@ -39,7 +39,7 @@ func TestMergeSettingsLocal(t *testing.T) {
 		{name: "new file", want: []string{testHook.Command}},
 		{name: "keeps other settings and hooks", old: `{"model":"opus","hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}],"PreToolUse":[]}}`,
 			want: []string{"say done", testHook.Command}},
-		{name: "replaces an existing gate hook", old: `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/old/newproj gate --hook --budget 30s","timeout":60}]}]}}`,
+		{name: "replaces an existing gate hook", old: `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/old/doneness hook --budget 30s","timeout":60}]}]}}`,
 			want: []string{testHook.Command}},
 	}
 	for _, tt := range tests {
@@ -90,7 +90,7 @@ func TestMergeSettingsMinimalPatch(t *testing.T) {
     "hooks": {
         "Stop": [
             {"hooks": [{"type": "command", "command": "say done"}]},
-            {"hooks": [{"type": "command", "command": "newproj gate --hook --budget 1770s", "timeout": 1800}]}
+            {"hooks": [{"type": "command", "command": "doneness hook --budget 1770s", "timeout": 1800}]}
         ]
     }
 }
@@ -107,7 +107,7 @@ func TestMergeSettingsMinimalPatch(t *testing.T) {
 			want: `{
   "hooks": {
     "PreToolUse": [],
-    "Stop": [{"hooks": [{"type": "command", "command": "newproj gate --hook --budget 1770s", "timeout": 1800}]}]
+    "Stop": [{"hooks": [{"type": "command", "command": "doneness hook --budget 1770s", "timeout": 1800}]}]
   }
 }
 `,
@@ -123,7 +123,7 @@ func TestMergeSettingsMinimalPatch(t *testing.T) {
 			want: `{
   "hooks": {
     "Stop": [
-      {"hooks": [{"type": "command", "command": "newproj gate --hook --budget 1770s", "timeout": 1800}]}
+      {"hooks": [{"type": "command", "command": "doneness hook --budget 1770s", "timeout": 1800}]}
     ]
   }
 }
@@ -136,7 +136,7 @@ func TestMergeSettingsMinimalPatch(t *testing.T) {
 		"Stop": [
 			{
 				"hooks": [
-					{ "type": "command", "command": "'/old/newproj' gate --hook --budget 30s", "timeout": 60 }
+					{ "type": "command", "command": "'/old/doneness' hook --budget 30s", "timeout": 60 }
 				]
 			}
 		]
@@ -148,7 +148,7 @@ func TestMergeSettingsMinimalPatch(t *testing.T) {
 		"Stop": [
 			{
 				"hooks": [
-					{"type": "command", "command": "newproj gate --hook --budget 1770s", "timeout": 1800}
+					{"type": "command", "command": "doneness hook --budget 1770s", "timeout": 1800}
 				]
 			}
 		]

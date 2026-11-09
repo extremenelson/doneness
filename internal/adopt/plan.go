@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/extremenelson/newproj/internal/gate"
+	"github.com/extremenelson/doneness/internal/gate"
 )
 
 // Options configures Build.
@@ -54,8 +54,8 @@ type excludeEdit struct {
 // The rules block is delimited so a re-run replaces it instead of adding
 // another copy.
 const (
-	blockBegin = "<!-- newproj:begin (managed by `newproj adopt`; edits inside are replaced) -->"
-	blockEnd   = "<!-- newproj:end -->"
+	blockBegin = "<!-- doneness:begin (managed by `doneness adopt`; edits inside are replaced) -->"
+	blockEnd   = "<!-- doneness:end -->"
 )
 
 // Build computes what adopt would change in the repository at opts.Root.
@@ -97,8 +97,8 @@ func Build(ctx context.Context, opts Options) (*Plan, error) {
 	}
 
 	p.SideEffects = append(p.SideEffects,
-		"--apply runs `newproj gate` once: a pass records a receipt in "+gate.NotesRef+" (never pushed)",
-		"gate state (slot locks, session counters, last failures) lives under $XDG_STATE_HOME/newproj (default ~/.local/state/newproj)",
+		"--apply runs `doneness check` once: a pass records a receipt in "+gate.NotesRef+" (never pushed)",
+		"gate state (slot locks, session counters, last failures) lives under $XDG_STATE_HOME/doneness (default ~/.local/state/doneness)",
 		"nothing is committed, moved or pushed, and CI files are not touched",
 	)
 	return p, nil
@@ -115,7 +115,7 @@ func (p *Plan) addConfig(root string) error {
 		return err
 	}
 	// Render exactly what gate.WriteConfig writes, for the diff.
-	tmp, err := os.MkdirTemp("", "newproj-adopt-")
+	tmp, err := os.MkdirTemp("", "doneness-adopt-")
 	if err != nil {
 		return err
 	}
@@ -144,10 +144,10 @@ func (p *Plan) addHook(ctx context.Context, opts Options) error {
 		}
 		dir, file, bin = main, "settings.local.json", opts.Binary
 		if bin == "" || !filepath.IsAbs(bin) {
-			return errors.New("cannot determine this binary's absolute path for the local hook; use --shared or install newproj")
+			return errors.New("cannot determine this binary's absolute path for the local hook; use --shared or install doneness")
 		}
 		if isTemporary(bin) {
-			p.Warnings = append(p.Warnings, fmt.Sprintf("the hook will call %s, which looks like a temporary build (go run?); install newproj (go install) and re-run adopt", bin))
+			p.Warnings = append(p.Warnings, fmt.Sprintf("the hook will call %s, which looks like a temporary build (go run?); install doneness (go install) and re-run adopt", bin))
 		}
 	}
 	cmd, err := gate.HookCommand(bin, opts.HookTimeout)
@@ -209,11 +209,11 @@ func rulesBlock(command string) string {
 	var b strings.Builder
 	b.WriteString(blockBegin + "\n")
 	b.WriteString("## Definition of done\n\n")
-	fmt.Fprintf(&b, "- Done means `newproj gate` passes. It runs `%s` (from `%s`) and records a receipt for the exact tree it tested.\n", command, gate.ConfigFile)
+	fmt.Fprintf(&b, "- Done means `doneness check` passes. It runs `%s` (from `%s`) and records a receipt for the exact tree it tested.\n", command, gate.ConfigFile)
 	b.WriteString("- A Stop hook runs the gate when you finish. While it is red you are sent back with the failure; after 3 red attempts the session ends marked NOT DONE.\n")
 	b.WriteString("- The check only verifies. If it fails on formatting or generated files, fix them; do not weaken the check.\n")
 	fmt.Fprintf(&b, "- Never edit `%s`, the Stop hook or this block to get past the gate.\n", gate.ConfigFile)
-	b.WriteString("- One task per git worktree. Before you say a branch is done, `newproj gate --status` must say PASS.\n")
+	b.WriteString("- One task per git worktree. Before you say a branch is done, `doneness status` must say PASS.\n")
 	if _, err := exec.LookPath("bd"); err == nil {
 		b.WriteString("- Issues live in beads: run `bd prime` at session start; one bead per branch.\n")
 	}
@@ -224,7 +224,7 @@ func rulesBlock(command string) string {
 // withRulesBlock replaces an existing managed block, or appends one.
 func withRulesBlock(old []byte, block string) []byte {
 	s := string(old)
-	if i := strings.Index(s, "<!-- newproj:begin"); i >= 0 {
+	if i := strings.Index(s, "<!-- doneness:begin"); i >= 0 {
 		if j := strings.Index(s[i:], blockEnd); j >= 0 {
 			end := i + j + len(blockEnd)
 			if end < len(s) && s[end] == '\n' {
@@ -348,7 +348,7 @@ func writeFile(path string, b []byte) error {
 
 // unifiedDiff renders a change with git's diff (git is already required).
 func unifiedDiff(ctx context.Context, c Change) (string, error) {
-	tmp, err := os.MkdirTemp("", "newproj-diff-")
+	tmp, err := os.MkdirTemp("", "doneness-diff-")
 	if err != nil {
 		return "", err
 	}

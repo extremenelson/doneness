@@ -18,7 +18,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/extremenelson/newproj/internal/gate"
+	"github.com/extremenelson/doneness/internal/gate"
 )
 
 // The "all:" prefix matters: without it, embed silently skips files whose

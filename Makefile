@@ -1,4 +1,4 @@
-BINARY  := newproj
+BINARY  := doneness
 # bin/ holds the committed helper scripts, so build output goes to build/.
 OUT     := build
 SCRIPTS := $(wildcard bin/*)
@@ -34,7 +34,7 @@ tidy: ## Sync go.mod and go.sum with the imports in the code (rewrites files)
 
 fix: fmt tidy ## Rewrite formatting and go.mod/go.sum; run when check complains
 
-# check only verifies, so newproj's own done-gate (.newproj.json) can run it
+# check only verifies, so doneness's own done-gate (.doneness.json) can run it
 # and trust that a green tree is the tree that was tested.
 check: ## Everything that must pass before a commit (read-only)
 	golangci-lint fmt --diff
@@ -42,7 +42,7 @@ check: ## Everything that must pass before a commit (read-only)
 	golangci-lint run
 	go test -race ./...
 
-install: ## Install newproj into $(go env GOBIN) or ~/go/bin
+install: ## Install doneness into $(go env GOBIN) or ~/go/bin
 	go install .
 
 install-scripts: ## Copy the helper scripts in bin/ to $(SCRIPT_DIR) (default ~/bin)

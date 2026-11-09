@@ -1,10 +1,10 @@
 package main
 
-// Characterization tests (eng review D11): they pin what newproj does today,
-// before main.go is restructured into `newproj new` + internal/scaffold.
+// Characterization tests (eng review D11): they pin what doneness does today,
+// before main.go is restructured into `doneness new` + internal/scaffold.
 // When the restructure lands, only assertions for the approved intentional
 // changes may be edited (derived module prefix, verify-only `check` + `fix`,
-// Stop hook via gate.HookCommand, .newproj.json, stop-check.sh removed).
+// Stop hook via gate.HookCommand, .doneness.json, stop-check.sh removed).
 // T3 applied those changes; each edited assertion is marked "T3:".
 
 import (
@@ -23,14 +23,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/extremenelson/newproj/internal/gate"
-	"github.com/extremenelson/newproj/internal/scaffold"
+	"github.com/extremenelson/doneness/internal/gate"
+	"github.com/extremenelson/doneness/internal/scaffold"
 )
 
 // wantFiles is every file a scaffold of "demo" contains, relative to the
 // working directory, excluding git's own metadata (.git, .bare).
 var wantFiles = []string{
 	".claude/settings.json",
+	".doneness.json", // T3: gate config written by gate.WriteConfig
 	".editorconfig",
 	".env.example",
 	".gitattributes",
@@ -38,7 +39,6 @@ var wantFiles = []string{
 	".github/workflows/ci.yml",
 	".gitignore",
 	".golangci.yml",
-	".newproj.json", // T3: gate config written by gate.WriteConfig
 	"CLAUDE.md",
 	"Makefile",
 	"README.md",
@@ -57,7 +57,7 @@ func isolateGit(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "gitconfig")
 	// T3: the module prefix now comes from github.user; this value keeps
 	// the pre-T3 default module paths.
-	body := "[user]\n\tname = newproj test\n\temail = test@example.invalid\n" +
+	body := "[user]\n\tname = doneness test\n\temail = test@example.invalid\n" +
 		"[github]\n\tuser = extremenelson\n" +
 		"[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n"
 	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
@@ -65,10 +65,10 @@ func isolateGit(t *testing.T) {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", cfg)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv("NEWPROJ_PREFIX", "")
+	t.Setenv("DONENESS_PREFIX", "")
 }
 
-// scaffold runs newproj with flags, creating "demo" in a fresh parent dir,
+// scaffold runs doneness with flags, creating "demo" in a fresh parent dir,
 // and returns the project directory.
 func scaffoldDemo(t *testing.T, flags ...string) string {
 	t.Helper()
@@ -149,7 +149,7 @@ func TestParseArgs(t *testing.T) {
 	parent := t.TempDir()
 	tests := []struct {
 		name    string
-		env     string // NEWPROJ_PREFIX
+		env     string // DONENESS_PREFIX
 		args    []string
 		want    scaffold.Config
 		wantErr string
@@ -179,7 +179,7 @@ func TestParseArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("NEWPROJ_PREFIX", tt.env)
+			t.Setenv("DONENESS_PREFIX", tt.env)
 			got, err := parseArgsQuiet(tt.args)
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
@@ -299,7 +299,7 @@ func TestRunRefusesExistingDir(t *testing.T) {
 	if err := os.WriteFile(sentinel, []byte("mine"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err := run([]string{"-dir", parent, "demo"})
+	err := run([]string{"new", "-dir", parent, "demo"})
 	if err == nil || !strings.Contains(err.Error(), "already exists; refusing to overwrite") {
 		t.Fatalf("err = %v, want refusal", err)
 	}
@@ -373,7 +373,7 @@ func TestGeneratedMakeCheck(t *testing.T) {
 	}
 
 	// T3: the generated project passes its own done-gate (make check via
-	// .newproj.json), so a fresh scaffold starts green.
+	// .doneness.json), so a fresh scaffold starts green.
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	res, err := gate.Run(context.Background(), gate.Options{Root: dir, Slots: 1})
@@ -385,14 +385,14 @@ func TestGeneratedMakeCheck(t *testing.T) {
 	}
 }
 
-// TestGateCommandExitCodes drives `newproj gate` through run() and checks
+// TestCheckCommandExitCodes drives `doneness check` through run() and checks
 // the exit-code contract (eng review D8): 0 pass, 1 failed, 2 config error,
 // 3 tree changed, 4 timed out. Intentional change (D3): "gate" is now a
 // subcommand, so it can no longer be used as a project name.
-func TestGateCommandExitCodes(t *testing.T) {
+func TestCheckCommandExitCodes(t *testing.T) {
 	tests := []struct {
 		name    string
-		command string // "" = no .newproj.json
+		command string // "" = no .doneness.json
 		args    []string
 		want    int
 	}{
@@ -411,7 +411,7 @@ func TestGateCommandExitCodes(t *testing.T) {
 			isolateGit(t)
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-			t.Setenv("NEWPROJ_SLOTS", "2")
+			t.Setenv("DONENESS_SLOTS", "2")
 			repo := t.TempDir()
 			gitOut(t, repo, "init", "-q")
 			if err := os.WriteFile(filepath.Join(repo, "README"), []byte("hi\n"), 0o644); err != nil {
@@ -426,12 +426,12 @@ func TestGateCommandExitCodes(t *testing.T) {
 			gitOut(t, repo, "commit", "-q", "-m", "init")
 			t.Chdir(repo)
 			if tt.name == "cached pass" {
-				if err := run([]string{"gate"}); err != nil {
+				if err := run([]string{"check"}); err != nil {
 					t.Fatalf("first run: %v", err)
 				}
 			}
 
-			err := run(append([]string{"gate"}, tt.args...))
+			err := run(append([]string{"check"}, tt.args...))
 			got := 0
 			if err != nil {
 				var ec exitCode
@@ -447,12 +447,12 @@ func TestGateCommandExitCodes(t *testing.T) {
 	}
 }
 
-func TestGateCommandOutsideRepo(t *testing.T) {
+func TestCheckCommandOutsideRepo(t *testing.T) {
 	isolateGit(t)
 	t.Chdir(t.TempDir())
 	var ec exitCode
-	if err := run([]string{"gate"}); !errors.As(err, &ec) || ec != 2 {
-		t.Fatalf("run(gate) outside a repo = %v, want exit 2", err)
+	if err := run([]string{"check"}); !errors.As(err, &ec) || ec != 2 {
+		t.Fatalf("run(check) outside a repo = %v, want exit 2", err)
 	}
 }
 
@@ -461,12 +461,12 @@ func TestGateCommandOutsideRepo(t *testing.T) {
 // Stop-hook JSON on stdin, JSON decision on stdout, exit 0.
 func TestHookEndToEnd(t *testing.T) {
 	if testing.Short() {
-		t.Skip("builds the newproj binary")
+		t.Skip("builds the doneness binary")
 	}
 	isolateGit(t)
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	bin := filepath.Join(t.TempDir(), "newproj")
+	bin := filepath.Join(t.TempDir(), "doneness")
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
 	}
@@ -518,7 +518,7 @@ func TestHookEndToEnd(t *testing.T) {
 	}
 }
 
-// T3: with no -prefix, no $NEWPROJ_PREFIX and no github.user, newproj new
+// T3: with no -prefix, no $DONENESS_PREFIX and no github.user, doneness new
 // stops and says how to set a prefix instead of guessing one.
 func TestModulePrefixRequired(t *testing.T) {
 	isolateGit(t)
@@ -533,36 +533,12 @@ func TestModulePrefixRequired(t *testing.T) {
 	}
 }
 
-// T3: the pre-subcommand form still scaffolds (one-release alias) and says
-// it is deprecated.
-func TestOldFormIsDeprecatedAlias(t *testing.T) {
-	isolateGit(t)
-	parent := t.TempDir()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stderr := os.Stderr
-	os.Stderr = w
-	runErr := run([]string{"-flat", "-dir", parent, "demo"})
-	os.Stderr = stderr
-	_ = w.Close()
-	captured, _ := io.ReadAll(r)
-	if runErr != nil {
-		t.Fatalf("old form failed: %v", runErr)
-	}
-	if !strings.Contains(string(captured), "is deprecated; use `newproj new") {
-		t.Errorf("stderr = %q, want a deprecation note", captured)
-	}
-	assertFiles(t, filepath.Join(parent, "demo"))
-}
-
 func TestUnknownCommandAndNoArgs(t *testing.T) {
 	stderr := os.Stderr
 	devnull, _ := os.Open(os.DevNull)
 	os.Stderr = devnull
 	defer func() { os.Stderr = stderr; _ = devnull.Close() }()
-	for _, args := range [][]string{nil, {"Bogus"}, {"no_such"}} {
+	for _, args := range [][]string{nil, {"Bogus"}, {"no_such"}, {"gate"}, {"demo"}, {"-flat", "demo"}} {
 		var ec exitCode
 		if err := run(args); !errors.As(err, &ec) || ec != 2 {
 			t.Errorf("run(%q) = %v, want exit 2 with usage", args, err)
@@ -629,13 +605,13 @@ func captureStdout(t *testing.T, f func()) string {
 	return string(b)
 }
 
-// TestGateStatusCommand: `newproj gate --status [<rev>]` exits 0 when proven,
+// TestStatusCommand: `doneness status [<rev>]` exits 0 when proven,
 // 1 when not, 2 on error, and never runs the check.
-func TestGateStatusCommand(t *testing.T) {
+func TestStatusCommand(t *testing.T) {
 	isolateGit(t)
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Setenv("NEWPROJ_SLOTS", "1")
+	t.Setenv("DONENESS_SLOTS", "1")
 	dir := scaffoldDemo(t, "-flat")
 	t.Chdir(dir)
 	code := func(err error) int {
@@ -650,7 +626,7 @@ func TestGateStatusCommand(t *testing.T) {
 	}
 
 	var err error
-	out := captureStdout(t, func() { err = run([]string{"gate", "--status"}) })
+	out := captureStdout(t, func() { err = run([]string{"status"}) })
 	if c := code(err); c != 1 || !strings.Contains(out, "working tree (tree ") || !strings.Contains(out, "  unproven") {
 		t.Errorf("before gating: exit %d, output:\n%s", c, out)
 	}
@@ -659,30 +635,30 @@ func TestGateStatusCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	gitOut(t, dir, "commit", "-q", "-am", "fast gate for the test")
-	if err := run([]string{"gate"}); err != nil {
+	if err := run([]string{"check"}); err != nil {
 		t.Fatalf("gate: %v", err)
 	}
-	out = captureStdout(t, func() { err = run([]string{"gate", "--status"}) })
+	out = captureStdout(t, func() { err = run([]string{"status"}) })
 	if c := code(err); c != 0 || !strings.Contains(out, `  PASS `) || !strings.Contains(out, `"true"`) || strings.Contains(out, "warning:") {
 		t.Errorf("after a pass: exit %d, output:\n%s", c, out)
 	}
 
-	out = captureStdout(t, func() { err = run([]string{"gate", "--status", "HEAD"}) })
+	out = captureStdout(t, func() { err = run([]string{"status", "HEAD"}) })
 	if c := code(err); c != 0 || !strings.HasPrefix(out, "HEAD (tree ") {
-		t.Errorf("--status HEAD: exit %d, output:\n%s", c, out)
+		t.Errorf("status HEAD: exit %d, output:\n%s", c, out)
 	}
-	if c := code(run([]string{"gate", "--status", "no-such-rev"})); c != 2 {
-		t.Errorf("--status no-such-rev: exit %d, want 2", c)
+	if c := code(run([]string{"status", "no-such-rev"})); c != 2 {
+		t.Errorf("status no-such-rev: exit %d, want 2", c)
 	}
-	if c := code(run([]string{"gate", "--status", "--hook"})); c != 2 {
-		t.Errorf("--status --hook: exit %d, want 2", c)
+	if c := code(run([]string{"status", "--hook"})); c != 2 {
+		t.Errorf("status --hook (unknown flag): exit %d, want 2", c)
 	}
-	if c := code(run([]string{"gate", "HEAD"})); c != 2 {
-		t.Errorf("rev without --status: exit %d, want 2", c)
+	if c := code(run([]string{"check", "HEAD"})); c != 2 {
+		t.Errorf("check with a rev: exit %d, want 2", c)
 	}
 }
 
-// TestAdoptCommand drives `newproj adopt` on a plain repository: dry run
+// TestAdoptCommand drives `doneness adopt` on a plain repository: dry run
 // writes nothing, --apply writes the files and runs the gate (READY / NOT
 // READY), and errors exit 2.
 func TestAdoptCommand(t *testing.T) {
@@ -691,7 +667,7 @@ func TestAdoptCommand(t *testing.T) {
 		isolateGit(t)
 		t.Setenv("XDG_STATE_HOME", t.TempDir())
 		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-		t.Setenv("NEWPROJ_SLOTS", "1")
+		t.Setenv("DONENESS_SLOTS", "1")
 		repo, _ := filepath.EvalSymlinks(t.TempDir())
 		gitOut(t, repo, "init", "-q")
 		if err := os.WriteFile(filepath.Join(repo, "Makefile"), []byte("check:\n\t"+check+"\n"), 0o644); err != nil {
@@ -736,7 +712,7 @@ func TestAdoptCommand(t *testing.T) {
 		if c := code(t, err); c != 0 {
 			t.Fatalf("exit %d:\n%s", c, out)
 		}
-		if !strings.Contains(out, "READY: commit .newproj.json, CLAUDE.md so new worktrees inherit the gate.") {
+		if !strings.Contains(out, "READY: commit .doneness.json, CLAUDE.md so new worktrees inherit the gate.") {
 			t.Errorf("output:\n%s", out)
 		}
 		if _, err := gate.LoadConfig(repo); err != nil {

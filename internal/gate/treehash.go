@@ -23,7 +23,7 @@ func TreeHash(ctx context.Context, root string) (string, error) {
 		return "", err
 	}
 
-	tmp, err := os.CreateTemp("", "newproj-index-*")
+	tmp, err := os.CreateTemp("", "doneness-index-*")
 	if err != nil {
 		return "", err
 	}

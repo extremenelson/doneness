@@ -32,7 +32,7 @@ var outcomeNames = map[Outcome]string{
 
 func (o Outcome) String() string { return outcomeNames[o] }
 
-// ExitCode is the `newproj gate` process exit status for o (outside hook
+// ExitCode is the `doneness check` process exit status for o (outside hook
 // mode): 0 pass, 1 check failed, 2 config error, 3 tree changed, 4 timed
 // out, 130 interrupted.
 func (o Outcome) ExitCode() int {
@@ -94,7 +94,7 @@ func Version() string {
 func Run(ctx context.Context, opts Options) (Result, error) {
 	logf := func(format string, args ...any) {
 		if opts.Log != nil {
-			_, _ = fmt.Fprintf(opts.Log, "gate: "+format+"\n", args...)
+			_, _ = fmt.Fprintf(opts.Log, "doneness: "+format+"\n", args...)
 		}
 	}
 	out := opts.Out

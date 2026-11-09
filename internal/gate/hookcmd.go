@@ -9,7 +9,7 @@ import (
 )
 
 // BinaryName is the command name the hook invokes when it relies on PATH.
-const BinaryName = "newproj"
+const BinaryName = "doneness"
 
 const (
 	// MinHookTimeout is the shortest Stop-hook timeout a gate accepts.
@@ -56,16 +56,16 @@ func HookCommand(bin string, hookTimeout time.Duration) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s || { printf '%%s\\n' %s; exit 0; }; %s gate --hook --budget %ds",
+	return fmt.Sprintf("%s || { printf '%%s\\n' %s; exit 0; }; %s hook --budget %ds",
 		check, shellQuote(string(notice)), invoke, budget), nil
 }
 
 // hookBinaryRE matches a gate invocation at the start of a shell command or
 // after a command separator, capturing the binary: BinaryName on PATH, or
 // any path (single-quoted as HookCommand writes it, or bare) whose last
-// element is BinaryName, followed by `gate --hook`.
+// element is BinaryName, followed by the `hook` subcommand.
 var hookBinaryRE = regexp.MustCompile(
-	`(?:^|[;&|]\s*)('(?:[^']|'\\'')*/` + BinaryName + `'|(?:\S*/)?` + BinaryName + `)\s+gate\s+--hook(?:\s|$)`)
+	`(?:^|[;&|]\s*)('(?:[^']|'\\'')*/` + BinaryName + `'|(?:\S*/)?` + BinaryName + `)\s+hook(?:\s|$)`)
 
 // HookBinary returns the gate binary a hook command invokes: an absolute
 // path, or "" when it looks BinaryName up on PATH. ok is false when cmd is
@@ -87,7 +87,7 @@ func HookBinary(cmd string) (path string, ok bool) {
 
 // IsGateHook reports whether a hook command runs the gate. It recognizes
 // every command HookCommand produces and a hand-written
-// `newproj gate --hook`.
+// `doneness hook`.
 func IsGateHook(cmd string) bool {
 	_, ok := HookBinary(cmd)
 	return ok

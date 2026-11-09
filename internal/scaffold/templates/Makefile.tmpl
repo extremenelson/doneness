@@ -33,7 +33,7 @@ tidy: ## Sync go.mod and go.sum with the imports in the code (rewrites files)
 fix: fmt tidy ## Rewrite formatting and go.mod/go.sum; run before check if it complains
 
 # check only verifies: it never rewrites files, so the done-gate can run it
-# (.newproj.json) and trust that a green tree is the tree that was tested.
+# (.doneness.json) and trust that a green tree is the tree that was tested.
 check: ## Everything that must pass before a commit (read-only)
 	golangci-lint fmt --diff
 	go mod tidy -diff

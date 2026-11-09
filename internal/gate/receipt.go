@@ -16,7 +16,7 @@ import (
 
 // NotesRef is the git notes ref that holds PASS receipts, one note per
 // tested tree.
-const NotesRef = "refs/notes/newproj-gate"
+const NotesRef = "refs/notes/doneness"
 
 // Receipt records that a tree passed the gate. Only passes are recorded in
 // git; the latest failure per tree is kept in local state (see LastRed).
@@ -29,7 +29,7 @@ type Receipt struct {
 	Host       string    `json:"host"`
 	GOOS       string    `json:"goos"`
 	GOARCH     string    `json:"goarch"`
-	Version    string    `json:"newproj_version"`
+	Version    string    `json:"doneness_version"`
 }
 
 // satisfies reports whether r proves cfg for this platform and gate version,
@@ -120,7 +120,7 @@ func lockNotes(ctx context.Context, root string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(filepath.Join(common, "newproj-gate-notes.lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	f, err := os.OpenFile(filepath.Join(common, "doneness-notes.lock"), os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, err
 	}

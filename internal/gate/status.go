@@ -85,7 +85,7 @@ func Status(ctx context.Context, opts StatusOptions) (StatusReport, error) {
 	case r.Command != cfg.Gate.Command || r.ConfigHash != cfg.Hash():
 		rep.Stale = "config drift: the receipt was made with a different gate config"
 	case r.Version != version:
-		rep.Stale = fmt.Sprintf("made by newproj %s, this is %s", r.Version, version)
+		rep.Stale = fmt.Sprintf("made by doneness %s, this is %s", r.Version, version)
 	case !r.satisfies(cfg, version):
 		rep.Stale = fmt.Sprintf("made on %s/%s", r.GOOS, r.GOARCH)
 	default:
@@ -219,13 +219,13 @@ func hookStatus(ctx context.Context, root string) ([]string, error) {
 			found = true
 			if filepath.IsAbs(bin) {
 				if fi, err := os.Stat(bin); err != nil || fi.IsDir() || fi.Mode().Perm()&0o111 == 0 {
-					problems = append(problems, fmt.Sprintf("hook binary missing: %s (in %s); re-run `newproj adopt --apply`", bin, f))
+					problems = append(problems, fmt.Sprintf("hook binary missing: %s (in %s); re-run `doneness adopt --apply`", bin, f))
 				}
 			}
 		}
 	}
 	if !found {
-		problems = append(problems, "hook missing: no `newproj gate --hook` Stop hook in .claude/settings.json or settings.local.json; run `newproj adopt --apply`")
+		problems = append(problems, "hook missing: no `doneness hook` Stop hook in .claude/settings.json or settings.local.json; run `doneness adopt --apply`")
 	}
 	return problems, nil
 }

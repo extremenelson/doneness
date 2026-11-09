@@ -175,7 +175,7 @@ func TestSlotCount(t *testing.T) {
 		t.Errorf("default = %d, %v; want NumCPU/4", n, err)
 	}
 
-	mc := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "newproj", MachineConfigFile)
+	mc := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "doneness", MachineConfigFile)
 	write(t, mc, `{"slots": 3}`)
 	if n, err := SlotCount(); err != nil || n != 3 {
 		t.Errorf("from config = %d, %v; want 3", n, err)
@@ -220,7 +220,7 @@ func TestRunOutcomes(t *testing.T) {
 	}{
 		{name: "pass", command: "true", want: Pass},
 		{name: "compound pass", command: "true && test -f tracked.txt", want: Pass},
-		{name: "runs at top level", command: "test -f .newproj.json", want: Pass},
+		{name: "runs at top level", command: "test -f .doneness.json", want: Pass},
 		{name: "failure keeps exit code", command: "exit 3", want: Failed, code: 3},
 		{name: "command not found", command: "definitely-not-a-command-xyz", want: ConfigError, code: 127},
 		{name: "CI=1 is set", command: `test "$CI" = 1`, want: Pass},
@@ -264,7 +264,7 @@ func TestRunMissingConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := mustRun(t, context.Background(), opts(root))
-	if res.Outcome != ConfigError || !strings.Contains(res.Detail, "newproj adopt") {
+	if res.Outcome != ConfigError || !strings.Contains(res.Detail, "doneness adopt") {
 		t.Fatalf("outcome = %s (%q), want config error naming adopt", res.Outcome, res.Detail)
 	}
 }
