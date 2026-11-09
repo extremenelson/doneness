@@ -43,15 +43,22 @@ ordinary failure.
 Adopt detects the repository's own check command, in this order:
 
 1. **Makefile / justfile:** an aggregate target (`check`, `ci`, `verify`), else
-   the existing `lint`, `typecheck` and `test` targets joined with `&&`.
+   the existing format-check (`fmt`, `format`, `fmt-check`, `format:check`, ...),
+   `lint`, `vet`, `typecheck` and `test` targets joined with `&&`. If the repo's
+   own `test` target is missing or excluded, the language's test runner
+   (`go test ./...`, `cargo test`) takes its place.
 2. **package.json:** the same rule for scripts, run with the package manager
    its lockfile names (pnpm, yarn, bun, else npm).
-3. **Toolchain defaults:** `cargo clippy -- -D warnings && cargo test` for
-   Cargo, `go vet ./... && go test ./...` for Go.
+3. **Toolchain defaults:** `go vet ./... && go test ./...` for Go;
+   `cargo test` for Cargo, preceded by `cargo fmt --all --check` and clippy only
+   when the repo's CI runs them (keeping its `-D warnings` choice), so the gate
+   is never stricter than the project's own standard.
 
-Targets and scripts that rewrite files (`--fix`, `--write`, `-w`, a formatter
-or `tidy` without a check flag) are excluded, including through prerequisites,
-and the plan says why. Pass `--cmd "<command>"` to choose the command yourself;
+Targets and scripts that rewrite files are excluded, including through
+prerequisites, and the plan says why: `--fix`, `--write`, `-w`, a formatter or
+`tidy` without a check flag, `go get`, `go generate`, `go mod vendor`,
+`cargo update`, and package-manager installs without a frozen-lockfile flag
+(`npm ci` is fine). Pass `--cmd "<command>"` to choose the command yourself;
 a re-run keeps the command already in `.newproj.json`.
 
 With `--apply` it writes:

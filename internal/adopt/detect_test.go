@@ -95,8 +95,30 @@ func TestDetect(t *testing.T) {
 		{name: "package.json writer excluded", files: map[string]string{
 			"package.json": `{"scripts":{"lint":"prettier --write . && eslint .","test":"jest"}}`,
 		}, want: "npm run test", excluded: "package.json script lint: excluded: mutates (--write)"},
-		{name: "Cargo only", files: map[string]string{"Cargo.toml": "[package]\n"},
-			want: "cargo clippy -- -D warnings && cargo test"},
+		{name: "Cargo only: no stricter than the repo's CI", files: map[string]string{"Cargo.toml": "[package]\n"},
+			want: "cargo test"},
+		{name: "Cargo with CI fmt and strict clippy", files: map[string]string{
+			"Cargo.toml":               "[package]\n",
+			".github/workflows/ci.yml": "steps:\n  - run: cargo fmt --all --check\n  - run: cargo clippy --all-targets -- -D warnings\n",
+		}, want: "cargo fmt --all --check && cargo clippy -- -D warnings && cargo test"},
+		{name: "Cargo with CI clippy, warnings allowed", files: map[string]string{
+			"Cargo.toml": "[package]\n", ".gitlab-ci.yml": "lint:\n  script: cargo clippy\n",
+		}, want: "cargo clippy && cargo test"},
+		{name: "test excluded via go get prerequisite: Go test runner substituted, check-only fmt composed", files: map[string]string{
+			"go.mod": "module x\n",
+			"Makefile": "all: fmt test\nfmt:\n\t@test -z $(shell gofmt -l .) || (gofmt -d .; exit 1)\nlint:\n\tgolangci-lint run\n" +
+				"test: install_deps\n\tgo test ./...\ninstall_deps:\n\tgo get -v ./...\n",
+		}, want: "make fmt && make lint && go test ./...",
+			excluded: "Makefile target test: excluded: may rewrite tracked files (go get) (via install_deps)"},
+		{name: "no test target: Cargo test runner substituted", files: map[string]string{
+			"Cargo.toml": "[package]\n", "Makefile": "lint:\n\tcargo clippy\n",
+		}, want: "make lint && cargo test"},
+		{name: "package.json format:check composed, writing format excluded", files: map[string]string{
+			"package.json": `{"scripts":{"format":"prettier --write .","format:check":"prettier --check .","test":"vitest run"}}`,
+		}, want: "npm run format:check && npm run test", excluded: "package.json script format: excluded: mutates (--write)"},
+		{name: "vet composed", files: map[string]string{
+			"Makefile": "vet:\n\tgo vet ./...\ntest:\n\tgo test ./...\n",
+		}, want: "make vet && make test"},
 		{name: "go.mod only", files: map[string]string{"go.mod": "module x\n"},
 			want: "go vet ./... && go test ./..."},
 		{name: "build files rank before the toolchain", files: map[string]string{
@@ -144,6 +166,18 @@ func TestMutates(t *testing.T) {
 		{"go test -run TestFormat ./...", false},
 		{"go vet ./...", false},
 		{"./scripts/format.sh", false},
+		{"go get -v ./...", true},
+		{"go generate ./...", true},
+		{"go mod vendor", true},
+		{"go mod download", false},
+		{"cargo update", true},
+		{"npm install", true},
+		{"npm ci", false},
+		{"npm run test", false},
+		{"pnpm install --frozen-lockfile", false},
+		{"yarn install --immutable", false},
+		{"bun add left-pad", true},
+		{"cd web && npm i", true},
 	}
 	for _, tt := range tests {
 		if _, got := mutates(tt.line); got != tt.want {
